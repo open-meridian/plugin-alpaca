@@ -33,11 +33,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from meridian.roles.connectivity import Trader
+
 from . import ws
 from .kinds import TRADING, Store
 from .settings import Credentials
 from .synthetic_broker import SyntheticBroker
-from .trading import Trader
 from .venue import SOURCE, update_of
 
 log = logging.getLogger("alpaca.updates")

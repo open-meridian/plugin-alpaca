@@ -22,7 +22,8 @@ deployment launched it with `connectivity`: it hears each placement naming
 its instance and places it at Alpaca's Trading API in the environment
 chosen (paper or live), hears Alpaca's trade updates and reads the orders,
 honouring the firm's pauses and stops, and from 0.8.0 reports the fills of
-orders placed in Alpaca's own app on no placement (trading.py, updates.py).
+orders placed in Alpaca's own app on no placement (the SDK's
+`meridian.roles.connectivity.Trader`; updates.py).
 From 0.8.0, where launched with `custody`, it is the account's custodian
 too: it reads the account every Read every, reporting its positions, cash
 and activity (custody.py). Sample data trades with, and reads, a simulated
@@ -48,9 +49,10 @@ from typing import Any
 
 import meridian
 from meridian import edge
+from meridian.roles.connectivity import Sent, Trader, Watched, trading_files
 
 from .broker import Broker, base_for, stream_for
-from .custody import Syncer
+from .custody import MARKET_ZONE, Syncer
 from .declaration import DECLARATION, PORT
 from .kinds import Store, tend, windows_from
 from .kinds import root as kinds_root
@@ -62,7 +64,6 @@ from .source import AlpacaSource
 from .stream import AlpacaFeed, Feed, Streamer, symbol_limit
 from .synthetic import SyntheticFeed, SyntheticTransport, exchange
 from .synthetic_broker import SyntheticBroker
-from .trading import Noted, Trader, Watched, trading_files
 from .updates import AlpacaUpdates, SyntheticUpdates
 from .vendor import IEX, Alpaca, NoKey, VendorError, urllib_transport
 from .venue import AlpacaVenue
@@ -365,11 +366,12 @@ async def run() -> None:
                 plugin,
                 lambda: account.venue,
                 now=lambda: datetime.now(UTC),
-                sent=Noted(sent),
-                enabled=Noted(enabled),
+                sent=Sent(sent),
+                enabled=Sent(enabled),
                 # The venue account codes its ems mapped on it (W11.22).
                 scope=lambda: state.scope,
                 watched=Watched(originated),
+                market_zone=MARKET_ZONE,
             )
         configured = asyncio.Event()
         page = serve(plugin, state, port)

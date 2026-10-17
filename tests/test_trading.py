@@ -13,11 +13,11 @@ from pathlib import Path
 
 from meridian.operations import as_decimal
 from meridian.plugin.v1 import operations_pb2 as ops
+from meridian.roles.connectivity import Sent, Watched, execution_id, fill_price
 from meridian.suites import Recorder
 
 from alpaca import synthetic_broker
 from alpaca.synthetic_broker import SyntheticBroker
-from alpaca.trading import Noted, Watched, execution_id, fill_price
 from trading_cases import CODE, Rig, asking, clock, placement
 
 
@@ -93,7 +93,7 @@ def test_a_send_never_answered_is_asked_about_never_sent_again() -> None:
 
 
 def test_a_restart_never_sends_a_placement_twice(tmp_path: Path) -> None:
-    sent = Noted(tmp_path / "trading" / "sent.json")
+    sent = Sent(tmp_path / "trading" / "sent.json")
     brokerage = SyntheticBroker(clock, tmp_path / "synthetic-venue" / "orders.json")
     recorder = Recorder("alpaca")
     rig = placed(recorder, quantity="200", sent=sent, broker=brokerage)
@@ -104,7 +104,7 @@ def test_a_restart_never_sends_a_placement_twice(tmp_path: Path) -> None:
     again = Recorder("alpaca")
     restarted = Rig(
         again,
-        sent=Noted(tmp_path / "trading" / "sent.json"),
+        sent=Sent(tmp_path / "trading" / "sent.json"),
         broker=SyntheticBroker(clock, tmp_path / "synthetic-venue" / "orders.json"),
     )
     restarted.holds(placement(quantity="200"))
@@ -211,7 +211,7 @@ def test_a_pause_holds_a_placement_back_until_lifted() -> None:
 def test_enabling_trading_publishes_the_catalogue(tmp_path: Path) -> None:
     recorder = Recorder("alpaca")
     rig = Rig(recorder, enabled=False)
-    rig.enabled = Noted(tmp_path / "trading" / "enabled.json")
+    rig.enabled = Sent(tmp_path / "trading" / "enabled.json")
     rig.trader = rig.make()
     run(rig.trader.start())
     (first,) = recorder.on("ReportVenueCatalogue")
@@ -299,10 +299,10 @@ def test_a_status_alpaca_lists_and_the_mapping_does_not_is_unknown_then_known() 
 
 
 def test_a_fills_price_from_two_averages() -> None:
-    assert fill_price(Decimal(4), Decimal("10"), Decimal(10), Decimal("11.2")) == (
+    assert fill_price(Decimal(4), Decimal("10"), Decimal(10), Decimal("11.2"), 8) == (
         Decimal("12"),
         False,
     )
-    price, rounded = fill_price(Decimal(1), Decimal(1), Decimal(4), Decimal("1.1"))
+    price, rounded = fill_price(Decimal(1), Decimal(1), Decimal(4), Decimal("1.1"), 8)
     assert rounded and price == Decimal("1.13333333")
     assert execution_id("syn-ord-1", Decimal("4.0")) == "syn-ord-1:4"

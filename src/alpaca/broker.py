@@ -21,7 +21,7 @@ the moment its answer arrived, before anything reads it: a read under
 `responses`, a page of activities under `activity`, a send under `trading`.
 A send that never got an answer is kept too, saying so, and raises
 `Unanswered`: it may have reached Alpaca, and is never sent again on its own
-(trading.py). Alpaca's numbers are text; a body is parsed with every number
+(the SDK's Trader). Alpaca's numbers are text; a body is parsed with every number
 a Decimal from its own text.
 
 **Rate limits.** Alpaca allows a key 200 Trading API calls a minute; this

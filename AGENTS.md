@@ -40,16 +40,18 @@ as for every plugin.
 - `src/alpaca/synthetic.py` and `exchanges/exchange.json`: Alpaca's responses
   with invented values, for sample data, the tests and the e2e. Never
   commit a real response: they are the account holder's, for personal use.
-- `src/alpaca/trading.py`: the connectivity role, in SnapTrade 0.16.0's
-  shape: placements heard, sent, changed and cancelled; facts reported;
-  fills derived to one ID however they are heard; pauses and stops;
+- `src/alpaca/venue.py`: the connectivity role's adapter. From 0.11.0 the
+  role's work is the SDK's (`meridian.roles.connectivity.Trader`,
+  open-meridian 0.30.0): placements heard, sent, changed and cancelled; facts
+  reported; fills derived to one ID however they are heard; pauses and stops;
   enabling trading and the catalogue. `venue.py` is Alpaca's words for it,
   `broker.py` the one module that speaks to the Trading API (paper or live,
   every exchange a raw record first, `kinds.py`), `updates.py` the trade
-  updates stream, `trading_page.py` the Trading and Raw records pages. From
-  0.8.0 an order placed in Alpaca's own app has its fills reported on no
-  placement (`Originated`, `Watched`: `trading/originated.json`), and the
-  placement an accept creates is followed for its later fills.
+  updates stream, `trading_page.py` the Trading page (the SDK's `trading_read`
+  and template) and Raw records. From 0.8.0 an order placed in Alpaca's own
+  app has its fills reported on no placement (`Originated`, `Watched`:
+  `trading/originated.json`), and the placement an accept creates is followed
+  for its later fills.
 - `src/alpaca/custody.py`: the custody role (from 0.8.0): the account, its
   positions, cash and activities read from the Trading API and reported
   (`Syncer`), every value closed rather than read carrying its provenance;

@@ -16,7 +16,9 @@ its frames as binary, which ws.py reads as text.
 Trader converts it. A session that breaks or goes silent is opened again, a
 second later, doubling to a minute; what it missed while down the Trader's
 next read of the orders finds, its fills derived the same way, so nothing is
-reported twice.
+reported twice. Why it stopped is said in the log and on the Trading page:
+the failure's type and message (a close's code and reason, a silence's
+length), never the key.
 
 Synthetic mode hears the simulated brokerage's updates (synthetic_broker.py)
 the same way, nothing reaching Alpaca.
@@ -33,17 +35,33 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from meridian.roles.connectivity import Trader
+
 from . import ws
 from .kinds import TRADING, Store
 from .settings import Credentials
 from .synthetic_broker import SyntheticBroker
-from .trading import Trader
 from .venue import SOURCE, update_of
 
 log = logging.getLogger("alpaca.updates")
 
 FIRST_WAIT, MOST_WAIT = 1.0, 60.0
 SILENT_SECONDS = 600.0
+
+
+def described(failed: BaseException) -> str:
+    """A failure as the log and the Trading page say it: its type, and its
+    message where it has one (a bare TimeoutError has none)."""
+    said = str(failed)
+    return f"{type(failed).__name__}: {said}" if said else type(failed).__name__
+
+
+async def _heard(socket: Any, seconds: float, waiting_for: str) -> Any:
+    """The socket's next message, or a TimeoutError saying what was awaited."""
+    try:
+        return await asyncio.wait_for(socket.recv(), seconds)
+    except TimeoutError:
+        raise TimeoutError(f"{waiting_for} for {seconds:.0f}s") from None
 
 
 def _textual(value: Any) -> Any:
@@ -93,7 +111,7 @@ class AlpacaUpdates:
                     }
                 )
             )
-            said = json.loads(await asyncio.wait_for(socket.recv(), 30))
+            said = json.loads(await _heard(socket, 30, "no answer to the key"))
             data = said.get("data") if isinstance(said, dict) else None
             if not isinstance(data, dict) or data.get("status") != "authorized":
                 raise ws.Closed("Alpaca did not authorize the key on its trade updates")
@@ -102,7 +120,7 @@ class AlpacaUpdates:
             )
             self.state = "streaming"
             while True:
-                text = await asyncio.wait_for(socket.recv(), SILENT_SECONDS)
+                text = await _heard(socket, SILENT_SECONDS, "nothing heard")
                 message = json.loads(text, parse_float=Decimal)
                 if isinstance(message, dict) and message.get("stream") == "trade_updates":
                     await hear(trader, store, message.get("data") or {}, False)
@@ -119,8 +137,9 @@ class AlpacaUpdates:
             except asyncio.CancelledError:
                 raise
             except (ws.Closed, OSError, TimeoutError, ValueError) as failed:
-                self.state, self.last_error = "waiting", str(failed)[:200]
-                log.warning("the trade updates stopped (%s); again in %.0fs", failed, wait)
+                reason = described(failed)
+                self.state, self.last_error = "waiting", reason[:200]
+                log.warning("the trade updates stopped (%s); again in %.0fs", reason, wait)
             await asyncio.sleep(wait)
             wait = min(wait * 2, MOST_WAIT)
 

@@ -20,9 +20,10 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.10.0, on open-meridian 0.29.0 (contract 25): its whole
-declaration, and its documentation in [docs/](docs/), which a deployment
-shows on its Documentation tab; the daily dataset names the US equity
+**Status:** 0.11.0, on open-meridian 0.30.0 (contract 25): its connectivity
+work the SDK's (`meridian.roles.connectivity`); its whole declaration,
+and its documentation in [docs/](docs/), which a deployment shows on its
+Documentation tab; the daily dataset names the US equity
 calendar (contract 24's `calendar_id`). Not released; its pins are the
 released SDK, CLI and core v25 (abf028f), by tag and digest.
 

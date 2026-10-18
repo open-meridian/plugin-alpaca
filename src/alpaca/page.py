@@ -25,6 +25,7 @@ from typing import Any
 import meridian
 from meridian.plugin.v1 import operations_pb2 as ops
 from meridian.roles import data
+from meridian.roles.connectivity import Trader
 
 from .convert import NEW_YORK
 from .custody import Syncer
@@ -42,7 +43,6 @@ from .records import (
 from .settings import Config
 from .source import AlpacaSource
 from .stream import Streamer
-from .trading import Trader
 from .vendor import IEX, LIMIT_PER_MINUTE, NS, SIP, Alpaca, Usage
 
 TITLE = "Alpaca"

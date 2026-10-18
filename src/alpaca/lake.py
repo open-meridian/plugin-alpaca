@@ -46,7 +46,9 @@ spelling of a share class. Using another source's symbol, it reports its own
 beside it (W3.1), so the record carries this source's code; where that
 resolve is ambiguous it is reported as a miss (W3.2), and the want is still
 answered for the subject the lake named. A subject whose record carries no
-symbol is declined, not covered. Which symbol each subject is, is kept in
+symbol is declined, not covered, and so is one whose symbol the source
+answered it cannot take (Alpaca's 400, "invalid symbol"), once for the date
+and never asked of Alpaca again. Which symbol each subject is, is kept in
 the plugin's storage, to rebuild from.
 
 **Every venue is the venue master's.** A live price's exchange is resolved
@@ -67,7 +69,7 @@ import json
 import logging
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -151,6 +153,11 @@ class Source(Protocol):
     def trades(self, symbols: Sequence[str], start_ns: int, end_ns: int) -> list[SourceTrade]: ...
 
     def quotes(self, symbols: Sequence[str]) -> list[SourceQuote]: ...
+
+    @property
+    def invalid(self) -> Collection[str]:
+        """The symbols the vendor answered it cannot take: never asked again."""
+        ...
 
 
 @dataclass
@@ -577,6 +584,15 @@ class Lake:
         counts.last_declined = reason
         self.by_want.setdefault(want_id, [0, 0])[1] += len(subjects)
 
+    def _not_covered(self, symbols: dict[str, str]) -> list[str]:
+        """The subjects whose symbol the source answered it cannot take,
+        taken out of `symbols`: declined as not covered, settled."""
+        invalid = self.source.invalid if self.source is not None else ()
+        refused = [subject for subject, symbol in symbols.items() if symbol in invalid]
+        for subject in refused:
+            del symbols[subject]
+        return refused
+
     async def _fetch(self, call: Callable[[], Any]) -> Any:
         """A blocking call to the source, in a thread; None where it failed,
         which is said on the Connection page."""
@@ -642,6 +658,8 @@ class Lake:
         if bars is None:
             await self._decline(DAILY, want_id, list(symbols), "source_silent", settled=False)
             return list(symbols)
+        refused = self._not_covered(symbols)
+        await self._decline(DAILY, want_id, refused, "not_covered", day=span)
         by_symbol: dict[str, list[DailyBar]] = {}
         for bar in bars:
             counts.unconverted += len(bar.unconverted)
@@ -674,7 +692,7 @@ class Lake:
         if rows:
             await self._record(DAILY, data_type, rows, want_id)
         await self._decline(DAILY, want_id, silent, "source_silent", day=span)
-        return silent
+        return refused + silent
 
     # ── Live ─────────────────────────────────────────────────────────────
 
@@ -704,6 +722,8 @@ class Lake:
         if quoted is None:
             await self._decline(LIVE, want_id, list(symbols), "source_silent", settled=False)
             return list(symbols)
+        refused = self._not_covered(symbols)
+        await self._decline(LIVE, want_id, refused, "not_covered")
         counts = self.counts[LIVE]
         by_symbol: dict[str, list[Quoted]] = {}
         for each in quoted:
@@ -722,7 +742,7 @@ class Lake:
         if rows:
             await self._record(LIVE, PRICE, rows, want_id)
         await self._decline(LIVE, want_id, silent, "source_silent")
-        return silent
+        return refused + silent
 
     # ── Wants (W10.7) ────────────────────────────────────────────────────
 
@@ -956,6 +976,8 @@ class Lake:
         if found is None:
             await self._decline(TRADES, want_id, list(symbols), "source_silent", settled=False)
             return list(symbols)
+        refused = self._not_covered(symbols)
+        await self._decline(TRADES, want_id, refused, "not_covered")
         rows = [
             row
             for t in found
@@ -967,7 +989,7 @@ class Lake:
         if rows:
             await self._record_trades(rows, want_id)
         await self._decline(TRADES, want_id, silent, "source_silent")
-        return silent
+        return refused + silent
 
     async def quotes_now(self, subjects: Sequence[str], want_id: str = "") -> list[str]:
         """Record the latest quote of `subjects`, from Alpaca's latest quotes;
@@ -993,6 +1015,8 @@ class Lake:
         if found is None:
             await self._decline(LIVE, want_id, list(symbols), "source_silent", settled=False)
             return list(symbols)
+        refused = self._not_covered(symbols)
+        await self._decline(LIVE, want_id, refused, "not_covered")
         rows = [
             row
             for q in found
@@ -1004,7 +1028,7 @@ class Lake:
         if rows:
             await self._record(LIVE, QUOTE, rows, want_id)
         await self._decline(LIVE, want_id, silent, "source_silent")
-        return silent
+        return refused + silent
 
     async def trade_row(self, stated: SourceTrade, subject: str) -> Trade | None:
         """A trade as recorded for one record of its listing: the venue it printed

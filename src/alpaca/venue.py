@@ -1,4 +1,4 @@
-"""Alpaca as the Trader's venue (trading.py): its words to the contract's and
+"""Alpaca as the Trader's venue (meridian.roles.connectivity): its words to the contract's and
 back, over its Trading API (broker.py). The one place Alpaca's order
 vocabulary is read.
 
@@ -32,11 +32,18 @@ from decimal import Decimal
 from typing import Any
 
 from meridian.plugin.v1 import operations_pb2 as ops
+from meridian.roles import connectivity
+from meridian.roles.connectivity import (
+    Asked,
+    Catalogue,
+    Change,
+    VenueOrder,
+    VenueRefused,
+    VenueUnanswered,
+)
 
-from . import trading
 from .broker import Broker, BrokerError, Unanswered
 from .kinds import TRADING
-from .trading import Asked, Catalogue, Change, VenueOrder, VenueRefused, VenueUnanswered
 
 SOURCE = "alpaca"
 #: How long the account's number is held before it is read again.
@@ -44,7 +51,7 @@ ACCOUNT_READ_AGAIN = timedelta(minutes=10)
 
 STATUSES = {
     **{
-        status: trading.WORKING
+        status: connectivity.WORKING
         for status in (
             "new",
             "partially_filled",
@@ -57,13 +64,13 @@ STATUSES = {
             "calculated",
         )
     },
-    "filled": trading.FILLED,
-    "canceled": trading.CANCELLED,
-    "expired": trading.EXPIRED,
-    "rejected": trading.REJECTED,
-    "suspended": trading.SUSPENDED,
-    "done_for_day": trading.DONE_FOR_DAY,
-    "replaced": trading.REPLACED,
+    "filled": connectivity.FILLED,
+    "canceled": connectivity.CANCELLED,
+    "expired": connectivity.EXPIRED,
+    "rejected": connectivity.REJECTED,
+    "suspended": connectivity.SUSPENDED,
+    "done_for_day": connectivity.DONE_FOR_DAY,
+    "replaced": connectivity.REPLACED,
 }
 SIDES: dict[int, str] = {ops.SIDE_BUY: "buy", ops.SIDE_SELL: "sell", ops.SIDE_SELL_SHORT: "sell"}
 #: The contract's side for each of Alpaca's words for one (an order's
@@ -104,13 +111,13 @@ def order_of(said: Any) -> VenueOrder:
         status=str(held.get("status") or ""),
         symbol=str(held.get("symbol") or ""),
         side=str(held.get("side") or ""),
-        quantity=trading.number(held.get("qty")),
-        filled=trading.number(held.get("filled_qty")) or Decimal(0),
-        average=trading.number(held.get("filled_avg_price")),
-        limit=trading.number(held.get("limit_price")),
-        placed_at=trading.moment(held.get("submitted_at") or held.get("created_at")),
-        updated_at=trading.moment(held.get("updated_at")),
-        filled_at=trading.moment(held.get("filled_at")),
+        quantity=connectivity.number(held.get("qty")),
+        filled=connectivity.number(held.get("filled_qty")) or Decimal(0),
+        average=connectivity.number(held.get("filled_avg_price")),
+        limit=connectivity.number(held.get("limit_price")),
+        placed_at=connectivity.moment(held.get("submitted_at") or held.get("created_at")),
+        updated_at=connectivity.moment(held.get("updated_at")),
+        filled_at=connectivity.moment(held.get("filled_at")),
         replaced_by=str(held.get("replaced_by") or ""),
         replaces=str(held.get("replaces") or ""),
         reason=str(held.get("reason") or ""),
@@ -221,7 +228,7 @@ class AlpacaVenue:
         )
 
 
-def update_of(said: Any) -> tuple[str, VenueOrder, trading.Fill | None]:
+def update_of(said: Any) -> tuple[str, VenueOrder, connectivity.Fill | None]:
     """One of Alpaca's trade updates: its event, the order as it stands, and
     the fill as Alpaca stated it, where it is one."""
     held = said if isinstance(said, dict) else {}
@@ -229,7 +236,7 @@ def update_of(said: Any) -> tuple[str, VenueOrder, trading.Fill | None]:
     record = order_of(held.get("order"))
     fill = None
     if event in ("fill", "partial_fill"):
-        qty, price = trading.number(held.get("qty")), trading.number(held.get("price"))
+        qty, price = connectivity.number(held.get("qty")), connectivity.number(held.get("price"))
         if qty is not None and price is not None:
-            fill = trading.Fill(qty, price, trading.moment(held.get("timestamp")))
+            fill = connectivity.Fill(qty, price, connectivity.moment(held.get("timestamp")))
     return event, record, fill

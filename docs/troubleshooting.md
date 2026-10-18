@@ -15,7 +15,7 @@
 | Wants: **Past the stream's limit** | More listings are wanted than a free account may stream (30) | Fewer at once, or Algo Trader Plus |
 | Datasets: trades **unconverted** grows | Alpaca sent a condition code the plugin has no conversion for | Those trades' eligibilities are not known; the code is kept as reported |
 | Datasets: **Not licensed yet** | No deployment admin has licensed the dataset | Ask a deployment admin to license it on Data sources; the page says so within a minute |
-| Kept current: subjects **declined today** | Alpaca has nothing for a listing (a plan fund a custodian names), or its record names no symbol | Nothing; each is declined once for the date, and asked again the next day |
+| Kept current: subjects **declined today** | Alpaca has nothing for a listing (a plan fund a custodian names), or its record names no symbol | Nothing; each is declined once for the date, and asked again the next day; a symbol Alpaca answers is invalid is not asked of Alpaca again until the plugin restarts |
 
 ## The account
 

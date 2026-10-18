@@ -8,6 +8,7 @@ convert counted, never recorded."""
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,10 @@ from meridian.plugin.v1 import operations_pb2 as ops
 from meridian.suites import Recorder
 
 from alpaca.lake import LIVE_CADENCE_SECONDS, Lake, Products
+from alpaca.raw import RawStore
+from alpaca.source import AlpacaSource
+from alpaca.synthetic import SyntheticTransport
+from alpaca.vendor import NS, Alpaca, Response
 
 from conftest import (
     BRK,
@@ -27,6 +32,7 @@ from conftest import (
     Clock,
     answer_records,
     at,
+    no_wait,
     synthetic_lake,
     want,
 )
@@ -264,6 +270,8 @@ async def test_a_source_that_fails_is_said_and_its_subjects_silent(tmp_path: Pat
     recorder, lake, _ = made(tmp_path)
 
     class Failing:
+        invalid: frozenset[str] = frozenset()
+
         def daily(self, *_: Any) -> Any:
             raise OSError("no route to host")
 
@@ -376,6 +384,56 @@ async def test_an_unknown_symbol_is_declined_once_for_the_date(tmp_path: Path) -
     await lake.tick()
     declined = [s.entity_id for d in on(recorder, "DeclineWant") for s in d.subjects]
     assert declined == [TCH4, TCH4]
+
+
+class RefusingTCH4(SyntheticTransport):
+    """Alpaca as it answers a call naming a symbol it cannot take: a 400 for
+    the whole call, naming the symbol."""
+
+    def __call__(self, url: str, headers: Mapping[str, str]) -> Response:
+        if "TCH4" not in url:
+            return super().__call__(url, headers)
+        self.asked.append(url)
+        body = b'{"code":40010001,"message":"invalid symbol: TCH4"}'
+        return Response(400, {"content-type": "application/json"}, body)
+
+
+async def test_a_symbol_alpaca_calls_invalid_is_not_covered_and_never_asked_again(
+    tmp_path: Path,
+) -> None:
+    """The dev deployment's TCH4, asked of Alpaca's bars about once a minute
+    and refused each time (400, "invalid symbol: TCH4"), the whole call with
+    it: the call is asked again without it and SPY's close recorded; TCH4 is
+    declined as not covered, once for the date, and never asked of Alpaca
+    again however often the want comes back, nor for another date."""
+    recorder = Recorder("alpaca-1")
+    answer_records(recorder, WITH_TCH4)
+    clock = Clock(AFTER)
+    transport = RefusingTCH4()
+    alpaca = Alpaca(
+        RawStore(tmp_path / "raw"),
+        None,
+        transport=transport,
+        limiter=no_wait(),
+        clock_ns=clock,
+        keyless=True,
+    )
+    source = AlpacaSource(alpaca, synthetic=True)
+    lake = Lake(recorder, source, Products(tmp_path / "products.json"), clock)
+    recorder.answer("ObservationsWanted", lambda _: want(SPY, TCH4, business_date="2026-10-08"))
+    for minute in range(5):
+        clock.now = AFTER + minute * 60 * NS
+        await recorder.receive(observations_wanted=lake.on_want)
+    declined = [(d.reason, [s.entity_id for s in d.subjects]) for d in on(recorder, "DeclineWant")]
+    assert declined == [(ops.UNANSWERED_REASON_NOT_COVERED, [TCH4])]
+    assert sum("TCH4" in url for url in transport.asked) == 1
+    assert source.invalid == {"TCH4"} and not lake.last_error
+    assert prices(recorder)[0].meta.row_key == f"SPY:1d:2026-10-08@{SPY}"
+    recorder.answer("ObservationsWanted", lambda _: want(TCH4, business_date="2026-10-09"))
+    await recorder.receive(observations_wanted=lake.on_want)
+    assert len(on(recorder, "DeclineWant")) == 2
+    assert on(recorder, "DeclineWant")[-1].reason == ops.UNANSWERED_REASON_NOT_COVERED
+    assert sum("TCH4" in url for url in transport.asked) == 1
 
 
 async def test_a_source_that_fails_is_asked_again(tmp_path: Path) -> None:

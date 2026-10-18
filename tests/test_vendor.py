@@ -153,6 +153,33 @@ def test_latest_quotes_fall_back_to_iex_where_sip_refuses_them(tmp_path: Path) -
     assert "feed=iex" in transport.asked[2][0]
 
 
+def test_a_symbol_alpaca_calls_invalid_is_left_out_and_never_asked_again(
+    tmp_path: Path,
+) -> None:
+    """A 400 naming one of a call's symbols as invalid: the call asked again
+    without it, and the symbol never asked again; any other 400 is the
+    call's failure, raised."""
+    from alpaca.source import AlpacaSource
+
+    quote = (
+        '{"quotes":{"SPY":{"t":"2026-10-09T19:59:59Z","bx":"V","bp":575.4,"bs":1,'
+        '"ax":"V","ap":575.5,"as":1}}}'
+    )
+    transport = Scripted(
+        (400, '{"code":40010001,"message":"invalid symbol: tch4"}', {}),
+        (200, quote, {}),
+        (400, '{"code":40010001,"message":"invalid timeframe"}', {}),
+    )
+    source = AlpacaSource(client(tmp_path, transport), synthetic=True)
+    assert [q.symbol for q in source.quotes(["SPY", "TCH4"])] == ["SPY"]
+    assert "TCH4" in transport.asked[0][0] and "TCH4" not in transport.asked[1][0]
+    assert source.invalid == {"TCH4"}
+    assert source.quotes(["TCH4"]) == [] and len(transport.asked) == 2
+    with pytest.raises(VendorError):
+        source.quotes(["SPY", "TCH4"])
+    assert "TCH4" not in transport.asked[2][0]
+
+
 def test_a_refused_key_is_said(tmp_path: Path) -> None:
     transport = Scripted((401, '{"code":40110000,"message":"request is not authorized"}', {}))
     entitled = client(tmp_path, transport).entitlements()

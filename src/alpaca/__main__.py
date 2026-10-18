@@ -64,7 +64,7 @@ from .source import AlpacaSource
 from .stream import AlpacaFeed, Feed, Streamer, symbol_limit
 from .synthetic import SyntheticFeed, SyntheticTransport, exchange
 from .synthetic_broker import SyntheticBroker
-from .updates import AlpacaUpdates, SyntheticUpdates
+from .updates import AlpacaUpdates, SyntheticUpdates, described
 from .vendor import IEX, Alpaca, NoKey, VendorError, urllib_transport
 from .venue import AlpacaVenue
 
@@ -319,7 +319,7 @@ async def again(work: Callable[[], Coroutine[Any, Any, None]], what: str) -> Non
         except asyncio.CancelledError:
             raise
         except Exception as failed:  # noqa: BLE001 - said, and opened again
-            log.warning("%s stopped (%s); again in %.0fs", what, failed, wait)
+            log.warning("%s stopped (%s); again in %.0fs", what, described(failed), wait)
         await asyncio.sleep(wait)
         wait = min(wait * 2, 30.0)
 

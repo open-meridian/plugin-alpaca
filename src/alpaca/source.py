@@ -9,11 +9,18 @@ Connection page shows the answer. Should SIP refuse a live call the key was
 taken to have (403), the key is taken not to have SIP in real time from then
 on, and the call asked again of IEX: latest quotes and trades come from the
 feed the key is entitled to, never SIP's on a free or a paper key.
+
+A symbol Alpaca cannot take at all (a fund's code such as TCH4) it answers
+with a 400 for the whole call, naming it: "invalid symbol: TCH4". That is
+definitive: the symbol is kept as invalid, the call asked again without it,
+and it is never asked of Alpaca again while the plugin runs; the lake
+declines its subjects as not covered.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import re
 import threading
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -25,6 +32,21 @@ from .vendor import IEX, SIP, SYMBOLS_PER_CALL, Alpaca, Entitlements, VendorErro
 
 T = TypeVar("T")
 
+#: Alpaca's answer to a symbol it cannot take, for the whole call (a 400).
+INVALID_SYMBOL = re.compile(r"invalid symbol:\s*(\S+)", re.IGNORECASE)
+
+
+def invalid_symbol(refused: VendorError, asked: Sequence[str]) -> str | None:
+    """The symbol of `asked` that a 400 names as invalid, or None where it
+    is another refusal or names none of them."""
+    if refused.status != 400:
+        return None
+    found = INVALID_SYMBOL.search(refused.detail)
+    if found is None:
+        return None
+    named = found.group(1).strip(",.;\"'").upper()
+    return next((s for s in asked if s.upper() == named), None)
+
 
 class AlpacaSource:
     """lake.Source on Alpaca's Market Data API."""
@@ -34,6 +56,8 @@ class AlpacaSource:
         self.synthetic = synthetic
         self._entitled: Entitlements | None = None
         self._lock = threading.Lock()
+        #: The symbols Alpaca answered are invalid: never asked again.
+        self.invalid: set[str] = set()
 
     def entitlements(self, again: bool = False) -> Entitlements:
         """The feeds the key answered for, asked once (synthetic: IEX and SIP's
@@ -50,13 +74,34 @@ class AlpacaSource:
     def known(self) -> Entitlements | None:
         return self._entitled
 
+    def _each_call(self, symbols: Sequence[str], ask: Callable[[list[str]], list[T]]) -> list[T]:
+        """`ask` of `symbols`, a call's worth at a time, leaving out those
+        Alpaca answered are invalid. A call refused for one of its symbols
+        (400, "invalid symbol: X") keeps it as invalid and is asked again
+        without it."""
+        out: list[T] = []
+        valid = [s for s in symbols if s not in self.invalid]
+        for start in range(0, len(valid), SYMBOLS_PER_CALL):
+            chunk = valid[start : start + SYMBOLS_PER_CALL]
+            while chunk:
+                try:
+                    out.extend(ask(chunk))
+                    break
+                except VendorError as refused:
+                    named = invalid_symbol(refused, chunk)
+                    if named is None:
+                        raise
+                    with self._lock:
+                        self.invalid.add(named)
+                    chunk = [s for s in chunk if s != named]
+        return out
+
     def daily(self, symbols: Sequence[str], first: dt.date, last: dt.date) -> list[DailyBar]:
-        bars: list[DailyBar] = []
-        for start in range(0, len(symbols), SYMBOLS_PER_CALL):
-            chunk = symbols[start : start + SYMBOLS_PER_CALL]
-            for page in self.alpaca.daily_bars(chunk, first.isoformat(), last.isoformat(), SIP):
-                bars.extend(convert.daily_bars(page))
-        return bars
+        def ask(chunk: list[str]) -> list[DailyBar]:
+            pages = self.alpaca.daily_bars(chunk, first.isoformat(), last.isoformat(), SIP)
+            return [bar for page in pages for bar in convert.daily_bars(page)]
+
+        return self._each_call(symbols, ask)
 
     @property
     def live_feed(self) -> str:
@@ -82,12 +127,11 @@ class AlpacaSource:
         """The trades from `start_ns` to `end_ns`, from the live feed."""
 
         def ask(feed: str) -> list[SourceTrade]:
-            trades: list[SourceTrade] = []
-            for start in range(0, len(symbols), SYMBOLS_PER_CALL):
-                chunk = symbols[start : start + SYMBOLS_PER_CALL]
-                for page in self.alpaca.trades(chunk, start_ns, end_ns, feed):
-                    trades.extend(convert.trades_page(page))
-            return trades
+            def call(chunk: list[str]) -> list[SourceTrade]:
+                pages = self.alpaca.trades(chunk, start_ns, end_ns, feed)
+                return [trade for page in pages for trade in convert.trades_page(page)]
+
+            return self._each_call(symbols, call)
 
         return self._on_live_feed(ask)
 
@@ -95,21 +139,21 @@ class AlpacaSource:
         """The latest best bid and offer of each listing, from the live feed."""
 
         def ask(feed: str) -> list[SourceQuote]:
-            quotes: list[SourceQuote] = []
-            for start in range(0, len(symbols), SYMBOLS_PER_CALL):
-                chunk = symbols[start : start + SYMBOLS_PER_CALL]
-                quotes.extend(convert.latest_quote_rows(self.alpaca.latest_quotes(chunk, feed)))
-            return quotes
+            def call(chunk: list[str]) -> list[SourceQuote]:
+                return list(convert.latest_quote_rows(self.alpaca.latest_quotes(chunk, feed)))
+
+            return self._each_call(symbols, call)
 
         return self._on_live_feed(ask)
 
     def live(self, symbols: Sequence[str]) -> list[Quoted]:
         def ask(feed: str) -> list[Quoted]:
-            quoted: list[Quoted] = []
-            for start in range(0, len(symbols), SYMBOLS_PER_CALL):
-                chunk = symbols[start : start + SYMBOLS_PER_CALL]
-                quoted.extend(convert.latest_trades(self.alpaca.latest_trades(chunk, feed)))
-                quoted.extend(convert.latest_quotes(self.alpaca.latest_quotes(chunk, feed)))
-            return quoted
+            def call(chunk: list[str]) -> list[Quoted]:
+                return [
+                    *convert.latest_trades(self.alpaca.latest_trades(chunk, feed)),
+                    *convert.latest_quotes(self.alpaca.latest_quotes(chunk, feed)),
+                ]
+
+            return self._each_call(symbols, call)
 
         return self._on_live_feed(ask)

@@ -42,8 +42,8 @@ from the same image.
    conversion kept as reported, its eligibilities not known.
 6d. Caught up from the lake: the trades recorded after the watermark the
    last read said, none read twice.
-7. Parity: the plugin's pages, Connection and Datasets, the data role's
-   (contract v20), read under Manage and through `/mcp` as
+7. Parity: the plugin's pages, Connection (its sections under a tab row)
+   and Datasets, the data role's (contract v20), read under Manage and through `/mcp` as
    `alpaca__read_connection` and `alpaca__read_datasets`, the same answers
    under the role's names, the stream's session among Alpaca's own; neither
    shows a price.
@@ -320,7 +320,9 @@ def run():
     must("alpaca:daily" in shown and "573.78" not in shown and "<h2>Served</h2>" in shown,
          "step 7, the Datasets page, the role's, shows no price")
     shown = page("alpaca", "admin", "/")
-    must("<h2>Key</h2>" in shown and "<h2>Limits and use</h2>" in shown, "step 7, the role's Connection")
+    # The role's sections, one at a time under a tab row (0.12.1): Key first.
+    must(">Key</a>" in shown and ">Limits and use</a>" in shown and ">Stream</a>" in shown
+         and "Not entitled" in shown, "step 7, the role's Connection")
 
     # 8. Storage: which listing each subject is, kept across a new container.
     compose("up", "-d", "--no-deps", "--force-recreate", "alpaca")

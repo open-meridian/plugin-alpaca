@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.0 (unreleased)
+## 0.11.0 (2026-10-19)
 
 On open-meridian 0.30.0, contract 25 unchanged: the connectivity role's work
 is the SDK's (sdk-contract/the-sdk-carries-each-roles-common-logic, ruled

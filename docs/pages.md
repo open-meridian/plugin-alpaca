@@ -60,6 +60,12 @@ it; how many orders are working, held back by a pause or a stop, or of
 unknown outcome. **Enable trading** on a read-only account. No account's
 data.
 
+The **Connection** badge says whether agents may place orders on it: **Demo**
+where Environment says Paper and the session reached Alpaca's paper host
+(`paper-api.alpaca.markets`), **Live** where neither does, and **Live (environment not
+confirmed)** where the two disagree. The deployment refuses an agent's
+order on any connection that is not Demo.
+
 ## Raw records
 
 Under Open and View. What Alpaca answered, kept as raw records, followed from

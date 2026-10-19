@@ -22,6 +22,14 @@ rejected on the trade updates (`order_replace_rejected`).
 `canceled`; `expired`; `rejected`; `suspended`; `done_for_day`; `replaced`.
 Any other -- `held`, which Alpaca lists and does not describe, say -- is
 outcome unknown, the status as reported.
+
+**The environment its session reached** (contract v26, G1 question 5):
+`environment` is read from the host the Trading API is called at,
+`paper-api.alpaca.markets` `paper` and `api.alpaca.markets` `live`
+(`meridian.reached_environment`), and the SDK's Trader publishes it on the
+venue catalogue: the second key of the agents' demo-only guard, which
+counts a connection demo only while the setting and this both say `paper`.
+The simulated brokerage reaches no venue, so it reports `paper`.
 """
 
 from __future__ import annotations
@@ -31,6 +39,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+import meridian
 from meridian.plugin.v1 import operations_pb2 as ops
 from meridian.roles import connectivity
 from meridian.roles.connectivity import (
@@ -46,6 +55,11 @@ from .broker import Broker, BrokerError, Unanswered
 from .kinds import TRADING
 
 SOURCE = "alpaca"
+#: Alpaca's Trading API hosts, by the environment each is (contract v26).
+LIVE_HOSTS = ("api.alpaca.markets",)
+PAPER_HOSTS = ("paper-api.alpaca.markets",)
+#: What the simulated brokerage reports: it reaches no venue.
+PAPER = "paper"
 #: How long the account's number is held before it is read again.
 ACCOUNT_READ_AGAIN = timedelta(minutes=10)
 
@@ -134,6 +148,12 @@ class AlpacaVenue:
 
     def __init__(self, broker: Broker) -> None:
         self.broker = broker
+        #: The environment the session reached (above).
+        self.environment = (
+            PAPER
+            if broker.synthetic
+            else meridian.reached_environment(broker.base, live=LIVE_HOSTS, paper=PAPER_HOSTS)
+        )
         self._number = ""
         self._read_at: datetime | None = None
 

@@ -13,7 +13,7 @@ from meridian.suites import Recorder
 from meridian.testing import PageClient
 
 from alpaca.page import State, pages, use
-from alpaca.settings import SANDBOX, Config, Credentials
+from alpaca.settings import LIVE, PAPER, Config, Credentials
 from alpaca.trading_page import ENABLE_TRADING, RAW, TRADING
 from trading_cases import CODE, Rig, placement, scope
 
@@ -23,7 +23,9 @@ KEY = Credentials("PKTESTKEYID0000000009", "trading-page-secret-0000000000000000
 
 def state_with(rig: Rig, config: Config) -> State:
     asyncio.run(rig.trader.start())
-    return State(config=config, trader=rig.trader, store=rig.store, scope=rig.scope)
+    return State(
+        config=config, trader=rig.trader, store=rig.store, scope=rig.scope, venue=rig.venue
+    )
 
 
 def client_for(state: State, **given: object) -> PageClient:
@@ -47,7 +49,7 @@ def test_trading_serves_manage_alone_and_its_tool_reads_the_same(tmp_path: Path)
 
 def test_paper_is_said_plainly(tmp_path: Path) -> None:
     rig = Rig(Recorder("alpaca"))
-    config = Config(credentials=KEY, key_id_set=True, secret_key_set=True, environment=SANDBOX)
+    config = Config(credentials=KEY, key_id_set=True, secret_key_set=True, environment=PAPER)
     client = client_for(state_with(rig, config))
     page = client.get(TRADING, "admin").text
     assert "Paper: Alpaca&#39;s paper trading API, simulated money" in page
@@ -109,3 +111,47 @@ def test_raw_records_follows_a_facts_reference_for_a_reader_of_the_account(
     assert "placing an order" in page and "Trading" in page
     stranger = client_for(state)
     assert "placing an order" not in stranger.get(RAW, "read", ref=sent.raw_record.key).text
+
+
+def test_the_connections_badge_is_both_keys(tmp_path: Path) -> None:
+    """Contract v26 (W11.8): Demo where the setting and the session both say
+    paper, and "Live (environment not confirmed)" where they disagree -- here
+    a setting of Live over the simulated brokerage, which reports paper. The
+    tool reads the same."""
+    rig = Rig(Recorder("alpaca"))
+    client = client_for(state_with(rig, Config(sample_data=True)))
+    page = client.get(TRADING, "admin").text
+    assert "Demo" in page and "Alpaca's paper host" in page
+    data = client.call_tool("read_trading").data
+    assert data["reached_environment"] == "paper" and data["badge"] == "Demo"
+    mismatch = Config(
+        credentials=KEY,
+        key_id_set=True,
+        secret_key_set=True,
+        environment=LIVE,
+        environment_setting=LIVE,
+    )
+    client = client_for(state_with(Rig(Recorder("alpaca")), mismatch))
+    assert client.call_tool("read_trading").data["badge"] == "Live (environment not confirmed)"
+    assert "Live (environment not confirmed)" in client.get(TRADING, "admin").text
+
+
+def test_an_environment_saved_before_0_12_0_says_save_it_again(tmp_path: Path) -> None:
+    """SDK 0.31.1's refused value: the setting arrives empty, so the badge
+    is not Demo, and the page and its tool say to save it again."""
+    config = Config(sample_data=True, environment_setting="", environment_to_save="sandbox")
+    client = client_for(state_with(Rig(Recorder("alpaca")), config))
+    page = client.get(TRADING, "admin").text
+    assert 'Environment holds "sandbox", no longer offered' in page
+    assert 'data-om-opens="settings"' in page
+    data = client.call_tool("read_trading").data
+    assert data["environment_to_save"] == "sandbox"
+    assert data["badge"] == "Live (environment not confirmed)"
+
+
+def test_no_badge_before_there_is_a_client(tmp_path: Path) -> None:
+    rig = Rig(Recorder("alpaca"))
+    state = state_with(rig, Config())
+    state.venue = None
+    data = client_for(state).call_tool("read_trading").data
+    assert data["reached_environment"] == "" and data["badge"] == ""

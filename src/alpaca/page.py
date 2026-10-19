@@ -80,6 +80,9 @@ class State:
     #: delivered (for each kind's window).
     syncer: Syncer | None = None
     trader: Trader | None = None
+    #: Connectivity's venue as the settings stand, for the environment its
+    #: session reached (contract v26).
+    venue: Any = None
     updates: Any = None
     store: Store | None = None
     scope: meridian.AccountScope = field(default_factory=meridian.AccountScope)
@@ -169,6 +172,7 @@ def connection_read(state: State) -> ConnectionRead:
             or (stream.last_error if stream is not None else "")
         ),
         sessions=(1 if stream is not None and stream.state == "streaming" else 0),
+        environment_to_save=config.environment_to_save,
         detail=detail,
         not_entitled=(refused[:1].upper() + refused[1:]) if asked else "",
         feeds=feeds,

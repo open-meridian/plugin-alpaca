@@ -86,6 +86,7 @@ def trading_read() -> TradingRead:
         **{each.name: getattr(held, each.name) for each in fields(held)},
         reached_environment=reached,
         badge=meridian.connection_badge(config.environment_setting, reached) if reached else "",
+        environment_to_save=config.environment_to_save,
     )
 
 

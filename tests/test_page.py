@@ -163,3 +163,12 @@ def test_with_no_key_the_page_says_where_to_enter_it(tmp_path: Path) -> None:
     assert client.call_tool("read_connection").data["mode"] == "No key"
     datasets = client.get(DATASETS, "admin").text
     assert "No wants yet" in datasets
+
+
+def test_an_environment_saved_before_0_12_0_says_save_it_again() -> None:
+    """SDK 0.31.1's refused value, on Connection and in its tool."""
+    use(State(config=Config(environment_setting="", environment_to_save="sandbox")))
+    client = PageClient(pages)
+    text = client.get(CONNECTION, "admin").text
+    assert "no longer offered" in text and "sandbox" in text
+    assert client.call_tool("read_connection").data["environment_to_save"] == "sandbox"

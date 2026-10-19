@@ -57,6 +57,9 @@ class ConnectionRead(data.ConnectionRead):
     live_feed: str = ""
     last_status: int = 0
     stream: SessionRead | None = None
+    #: The value Environment was saved as where this version refused it
+    #: (SDK 0.31.1): save it again, as Paper or Live.
+    environment_to_save: str = ""
 
 
 @dataclass(frozen=True)
@@ -132,3 +135,6 @@ class TradingRead(connectivity.TradingRead):
 
     reached_environment: str = ""
     badge: str = ""
+    #: The value Environment was saved as where this version refused it
+    #: (SDK 0.31.1): save it again, as Paper or Live.
+    environment_to_save: str = ""

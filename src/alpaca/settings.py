@@ -17,9 +17,11 @@ every setting names the roles it serves:
   `live`, Alpaca's live Trading API (api.alpaca.markets), or from 0.12.0
   `paper` ("Paper", Alpaca's own word; contract v26, G1 question 4),
   Alpaca's paper trading API (paper-api.alpaca.markets), the same API with
-  simulated money. Before 0.12.0 the paper value was `sandbox`: the SDK
-  refuses a saved value its choices do not hold, so Environment is saved
-  again as Paper on upgrading. It decides which account custody reads and
+  simulated money. Before 0.12.0 the paper value was `sandbox`: from SDK
+  0.31.1 a saved value its choices no longer hold arrives unset and named
+  in `Settings.refused`, so the plugin reads Alpaca's paper host and its
+  pages say to save Environment again; the guard's first key is then
+  empty, which counts live. It decides which account custody reads and
   connectivity trades. Market data is one service whichever it is, and
   either account's key reads it. It defaults to `paper`, so Live is only
   ever a person's choice (the product owner, 2026-10-14). It is one key of
@@ -39,7 +41,7 @@ every setting names the roles it serves:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -162,6 +164,9 @@ class Config:
     sample_data: bool = False
     environment: str = PAPER
     environment_setting: str = PAPER
+    #: The value Environment was saved as where this version refused it
+    #: (SDK 0.31.1, `Settings.refused`): `sandbox`, from before 0.12.0.
+    environment_to_save: str = ""
     poll_seconds: int = DEFAULT_POLL_SECONDS
     stale_after: timedelta = timedelta(hours=DEFAULT_STALE_AFTER_HOURS)
 
@@ -176,9 +181,14 @@ class Config:
         return self.environment == PAPER
 
 
-def config_from(values: Mapping[str, object]) -> Config:
+def config_from(
+    values: Mapping[str, object], refused: Sequence[meridian.RefusedSetting] = ()
+) -> Config:
     """The settings as delivered, typed: Live only where it is chosen, Paper
-    otherwise, the declared default the SDK fills in while it is unset."""
+    otherwise, the declared default the SDK fills in while it is unset. A
+    saved value the SDK refused (`refused`) leaves the setting empty: Paper
+    is read, the guard's first key is empty, and the value is kept to say
+    so."""
     key_id, secret_key = str(values.get(KEY_ID) or ""), str(values.get(SECRET_KEY) or "")
     poll, stale = values.get(POLL_SECONDS), values.get(STALE_AFTER_HOURS)
     return Config(
@@ -187,7 +197,10 @@ def config_from(values: Mapping[str, object]) -> Config:
         secret_key_set=bool(secret_key),
         sample_data=values.get(SAMPLE_DATA) is True,
         environment=LIVE if values.get(ENVIRONMENT) == LIVE else PAPER,
-        environment_setting=str(values.get(ENVIRONMENT) or PAPER),
+        environment_setting=str(values.get(ENVIRONMENT) or ""),
+        environment_to_save=next(
+            (each.value or "?" for each in refused if each.name == ENVIRONMENT), ""
+        ),
         poll_seconds=(
             max(poll, LEAST_POLL_SECONDS)
             if isinstance(poll, int) and not isinstance(poll, bool)

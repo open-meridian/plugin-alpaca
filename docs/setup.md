@@ -13,7 +13,7 @@ In Alpaca's dashboard, under API keys, generate a key: the paper account's to tr
 
 **Manage → Settings.**
 
-1. **Environment**, first: **Paper** is Alpaca's paper trading API, simulated money; **Live** is its live Trading API. It must match the key. It is Paper until a person chooses Live. Agents may place orders only on Paper. Upgrading from 0.11.0 or earlier, where it was called Sandbox, save it again as Paper: until then the plugin does not start.
+1. **Environment**, first: **Paper** is Alpaca's paper trading API, simulated money; **Live** is its live Trading API. It must match the key. It is Paper until a person chooses Live. Agents may place orders only on Paper. Upgrading from 0.11.0 or earlier, where it was called Sandbox, save it again as Paper: until then Connection and Trading say so.
 2. The **API key ID** and the **API secret key**. Secret settings: once saved
    they are never shown again, logged, put on a page or sent anywhere but
    Alpaca.

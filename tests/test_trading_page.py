@@ -136,6 +136,19 @@ def test_the_connections_badge_is_both_keys(tmp_path: Path) -> None:
     assert "Live (environment not confirmed)" in client.get(TRADING, "admin").text
 
 
+def test_an_environment_saved_before_0_12_0_says_save_it_again(tmp_path: Path) -> None:
+    """SDK 0.31.1's refused value: the setting arrives empty, so the badge
+    is not Demo, and the page and its tool say to save it again."""
+    config = Config(sample_data=True, environment_setting="", environment_to_save="sandbox")
+    client = client_for(state_with(Rig(Recorder("alpaca")), config))
+    page = client.get(TRADING, "admin").text
+    assert 'Environment holds "sandbox", no longer offered' in page
+    assert 'data-om-opens="settings"' in page
+    data = client.call_tool("read_trading").data
+    assert data["environment_to_save"] == "sandbox"
+    assert data["badge"] == "Live (environment not confirmed)"
+
+
 def test_no_badge_before_there_is_a_client(tmp_path: Path) -> None:
     rig = Rig(Recorder("alpaca"))
     state = state_with(rig, Config())

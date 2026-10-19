@@ -6,5 +6,6 @@
 {% extends "meridian/roles/connectivity/trading.html" %}
 {% import "meridian/kit.html" as kit %}
 {% block vendor_notices %}
+{% if data.environment_to_save %}<div class="notice warn" role="status">Environment holds "{{ data.environment_to_save }}", no longer offered: save it again in <a href="#settings" data-om-opens="settings">Settings</a>.</div>{% endif %}
 {% if data.badge %}<p class="hint">Connection {% if data.badge == "Demo" %}{{ kit.badge("Demo", "good") }}{% elif data.badge == "Live" %}{{ kit.badge("Live", "warn") }}{% else %}{{ kit.badge(data.badge, "bad") }}{% endif %} The session reached Alpaca's {{ data.reached_environment }} host; agents may place orders only on a Demo connection.</p>{% endif %}
 {% endblock %}

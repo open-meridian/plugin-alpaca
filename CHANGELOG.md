@@ -2,14 +2,17 @@
 
 ## 0.12.0
 
-On open-meridian 0.31.0, contract 26.
+On open-meridian 0.31.1, contract 26.
 
 - **Environment's paper value is `paper`** ("Paper", Alpaca's own word;
   contract v26, G1 question 4): the setting is the SDK's
   `meridian.environment(demo="paper")`, Paper until a person chooses Live.
   **On upgrading, save Environment again as Paper:** a value saved before
-  0.12.0 is `sandbox`, which the SDK refuses as not one of the setting's
-  choices, so the plugin does not start until it is saved again.
+  0.12.0 is `sandbox`, which is no longer a choice. On open-meridian 0.31.1
+  it arrives unset and named in `Settings.refused`: the plugin reads
+  Alpaca's paper API, Trading's badge is not Demo, and Trading and
+  Connection say to save Environment again (`environment_to_save` in
+  `read_trading` and `read_connection`).
 - **The listings in the lake on the SDK** (ruling 213): `lake.py`, about
   1,170 lines kept nearly line for line with Tradier's, is now a subclass of
   open-meridian 0.31.0's `meridian.roles.data.listings.Feed` keeping only
@@ -36,8 +39,8 @@ On open-meridian 0.31.0, contract 26.
   `reports-a-flag-the-venue-does-not-state` are not presented, with why
   (Alpaca's stock data lists no event contract). The event group heard and
   read is the SDK's.
-- **The pins**: open-meridian 0.31.0, as released on PyPI, and
-  plugin-python:0.31.0 by tag and digest (`sha256:e041f83c...24cf5d2`); core
+- **The pins**: open-meridian 0.31.1, as released on PyPI, and
+  plugin-python:0.31.1 by tag and digest (`sha256:67781f14...a3535b39`); core
   v26's runtime and harness (17a13a2, merged as 648e25f, chart 0.1.308), by
   tag and digest; `meridian` 0.1.49, the first CLI holding contract v26's
   suites.

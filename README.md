@@ -20,7 +20,7 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.12.0, on open-meridian 0.31.0 (contract 26): its connectivity
+**Status:** 0.12.0, on open-meridian 0.31.1 (contract 26): its connectivity
 work the SDK's (`meridian.roles.connectivity`), and from 0.12.0 its listings
 in the lake too (`meridian.roles.data.listings`); the environment its
 session reached on its venue catalogue, the agents' demo-only guard's second
@@ -151,8 +151,8 @@ the key decides which account connectivity trades.
    until a person chooses Live: neither an upgrade nor an Environment never
    saved turns the plugin Live. Agents may place orders only on Paper (the
    agents' demo-only guard, contract v26). Before 0.12.0 Paper was called
-   Sandbox: on upgrading, save Environment again as Paper, or the plugin
-   does not start.
+   Sandbox: on upgrading, save Environment again as Paper; until then
+   Connection and Trading say so.
 4. Enter the **API key ID** and the **API secret key**. Both are secret
    settings: once saved they are never shown again, logged, put on a page or
    sent anywhere but Alpaca.

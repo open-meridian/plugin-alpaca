@@ -212,7 +212,7 @@ async def watch_settings(
     woken: asyncio.Event | None = None,
 ) -> None:
     async for delivered in plugin.settings():
-        state.config = config_from(delivered.values)
+        state.config = config_from(delivered.values, delivered.refused)
         state.values = dict(delivered.values)
         state.alpaca, state.source = source_for(state.config, store)
         if state.lake is not None:

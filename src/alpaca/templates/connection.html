@@ -6,6 +6,7 @@
 {% import "meridian/roles/_rows.html" as om %}
 {% block status %}<om-status data-om-header state="{{ head.state }}" label="{{ head.label }}">{{ head.label }}</om-status>{% endblock %}
 {% block vendor_notices %}
+{% if data.environment_to_save %}<div class="notice warn" role="status">Environment holds "{{ data.environment_to_save }}", no longer offered: save it again in <a href="#settings" data-om-opens="settings">Settings</a>.</div>{% endif %}
 <p class="muted wide-only">{% if data.mode == "Live" %}{{ data.detail }} {% endif %}Closes and daily bars from SIP; live prices, quotes and trades from {{ data.live_feed|upper }}<span class="wide-only">, streamed while wanted</span>.</p>
 {% endblock %}
 {% block vendor_rows %}

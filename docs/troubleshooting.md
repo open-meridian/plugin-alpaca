@@ -22,7 +22,7 @@
 | You see | It means | Do |
 |---|---|---|
 | Statements: **needs sign-in** | Alpaca refused the API key | Check it at Alpaca, or make a new one and enter it in Settings |
-| The plugin does not start after upgrading | Environment holds Sandbox, its name before 0.12.0 | Save Environment again as Paper in Settings |
+| Connection or Trading: **Environment holds "sandbox", no longer offered** | Its name before 0.12.0, no longer a choice | Save Environment again as Paper in Settings |
 | Statements: **disabled** | Alpaca says the account is closed or blocked | Raise it with Alpaca |
 | Statements: **stale** | Alpaca has not answered for longer than Stale after | Nothing, usually: the next read catches up |
 | An account readers cannot see | It is not linked, or they hold no grant on the account it is linked to | Link it on Account links; a deployment admin grants read or write |

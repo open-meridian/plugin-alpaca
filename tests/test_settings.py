@@ -71,16 +71,21 @@ def test_live_is_read_only_once_a_person_chooses_it() -> None:
     assert config.credentials is not None and config.credentials.key_id == KEY[KEY_ID]
 
 
-def test_a_value_saved_before_0_12_0_is_refused_by_the_sdk() -> None:
-    """`sandbox` was the paper value before 0.12.0: the SDK refuses a saved
-    value its choices do not hold, so Environment is saved again as Paper
-    on upgrading (CHANGELOG). The plugin itself never reads it as Live."""
-    import pytest
-
-    with pytest.raises(ValueError, match="not one of its choices"):
-        delivered({**KEY, ENVIRONMENT: "sandbox"})
-    config = config_from({**KEY, ENVIRONMENT: "sandbox"})
-    assert config.environment == PAPER and config.environment_setting == "sandbox"
+def test_a_value_saved_before_0_12_0_arrives_refused_and_unset() -> None:
+    """`sandbox` was the paper value before 0.12.0. From SDK 0.31.1 a saved
+    value the setting's choices no longer hold is delivered unset and said
+    in `Settings.refused`, never raised: the plugin reads Alpaca's paper
+    API, the guard's first key is empty (live), and the value is kept for
+    the pages to say save it again."""
+    value, refused = BY_NAME[ENVIRONMENT]._read("sandbox")
+    assert value is None and refused is not None
+    assert refused.reason == "not_a_choice" and "save it again" in refused.message
+    defaults = {s.name: s.default for s in SETTINGS if s.default is not None}
+    values = {k: v for k, v in {**defaults, **KEY}.items() if k != ENVIRONMENT}
+    config = config_from(values, (refused,))
+    assert config.environment == PAPER and base_for(config.environment) == PAPER_BASE
+    assert config.environment_setting == "" and config.environment_to_save == "sandbox"
+    assert config_from(delivered(KEY).values).environment_to_save == ""
 
 
 def test_the_setting_is_the_guards_first_key_as_delivered() -> None:

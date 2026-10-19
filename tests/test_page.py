@@ -64,10 +64,17 @@ def test_each_page_serves_manage_alone(client: PageClient) -> None:
 
 def test_the_connection_page_and_its_tool_read_one_source(client: PageClient) -> None:
     page = client.get(CONNECTION, "admin").text
-    # The data role's sections, in its order, with Alpaca's rows at its blocks.
-    assert page.index("<h2>Key</h2>") < page.index("<h2>Limits and use</h2>")
-    assert page.index("<h2>Limits and use</h2>") < page.index("<h2>Stream</h2>")
-    assert "Sample data" in page and "100 a minute" in page and "Not entitled" in page
+    # The data role's sections, in its order, one at a time under a tab row
+    # (so the page fits one screen), with Alpaca's rows in theirs: Key first.
+    assert page.index(">Key</a>") < page.index(">Limits and use</a>") < page.index(">Stream</a>")
+    assert 'href="?tab=key" aria-current="page"' in page
+    assert "Sample data" in page and "Not entitled" in page and "100 a minute" not in page
+    limits = client.get(CONNECTION, "admin", tab="limits").text
+    assert "100 a minute" in limits and "Not entitled" not in limits
+    stream = client.get(CONNECTION, "admin", tab="stream").text
+    assert "1 listings, since" in stream and "Reconnects" in stream
+    # A tab it does not have is Key.
+    assert 'href="?tab=key" aria-current="page"' in client.get(CONNECTION, "admin", tab="x").text
     answer = client.call_tool("read_connection")
     assert answer.status == 200 and answer.outcome == "unchanged"
     data = answer.data
@@ -75,7 +82,7 @@ def test_the_connection_page_and_its_tool_read_one_source(client: PageClient) ->
     assert [c["label"] for c in data["credentials"]] == ["API key ID", "API secret key"]
     assert data["limit"].startswith("100 a minute") and data["sessions"] == 1
     assert data["stream"]["state"] == "streaming" and data["stream"]["subscribed"] == 1
-    assert data["stream"]["reconnects"] == 2 and "1 listings, since" in page
+    assert data["stream"]["reconnects"] == 2
     assert "SIP" in data["not_entitled"] and "IEX" in data["entitled_at_vendor"]
 
 

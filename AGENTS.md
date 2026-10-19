@@ -59,7 +59,9 @@ as for every plugin.
 - `src/alpaca/custody.py`: the custody role (from 0.8.0): the account, its
   positions, cash and activities read from the Trading API and reported
   (`Syncer`), every value closed rather than read carrying its provenance;
-  `custody_pages.py` the Account links, Statements and History pages.
+  `custody_pages.py` the Account links, Statements and History pages: from
+  0.12.1 the SDK's (`meridian.roles.custody.account_pages`), the module
+  keeping only what Alpaca's sync holds (a `Source`).
 - `src/alpaca/synthetic_broker.py`: a simulated brokerage behind the Trading
   API's shapes, a symbol for each answer (`SYNREJ`, `SYNLOST`, `SYNODD`,
   `SYNBUST`, `SYNREN`), the account's positions and activities, and orders

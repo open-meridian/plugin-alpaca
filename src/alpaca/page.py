@@ -368,6 +368,11 @@ def figures(state: State) -> list[meridian.Figure]:
     )
 
 
+#: Connection's sections, one at a time under a tab row so the page fits one
+#: screen with the stream's session showing (`?tab=`); its tool answers all.
+CONNECTION_TABS = (("key", "Key"), ("limits", "Limits and use"), ("stream", "Stream"))
+
+
 @pages.page(
     CONNECTION,
     "Connection",
@@ -386,7 +391,9 @@ def figures(state: State) -> list[meridian.Figure]:
 )
 async def connection(request: meridian.Request) -> meridian.Response:
     read = connection_read(_state)
-    return pages.answer("connection.html", read, head=status(read))
+    asked = request.query.get("tab", "")
+    tab = asked if asked in dict(CONNECTION_TABS) else CONNECTION_TABS[0][0]
+    return pages.answer("connection.html", read, head=status(read), tabs=CONNECTION_TABS, tab=tab)
 
 
 @pages.page(

@@ -8,6 +8,9 @@ under the same names on every data plugin.
 
 ## Connection (`read_connection`)
 
+One section at a time, under a tab row (Key, Limits and use, Stream), so
+the page fits one screen; `read_connection` answers every section.
+
 - **Key:** the mode (Live, Sample data or No key); whether the API key ID
   and the API secret key are each set, never their values; what Alpaca
   serves your key (IEX in real time, every US exchange past 15 minutes,

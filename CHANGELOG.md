@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.12.1
+
+- **Custody's pages on the SDK** (ruling 213): Account links, Statements and
+  History are `meridian.roles.custody.account_pages(...)`, declared by the
+  SDK; `custody_pages.py` keeps only what Alpaca's sync holds (its `Source`:
+  the accounts the credential reaches, each one's statement and activities,
+  its custodian and account type). Their paths, tools, records and words are
+  as they were; the tools' descriptions are the SDK's. The plugin's own
+  `LinkAsked` and its unchanged Statements and History templates are gone
+  (the role's own are drawn); Account links keeps its template, for its
+  notice and its plain form per account.
+- **Connection fits one screen.** Its sections -- Key, Limits and use and
+  Stream -- show one at a time under a tab row (`?tab=key`, `limits`,
+  `stream`), so the page fits an 800-pixel screen with the stream's session
+  showing (it ran to about 820-900 pixels). `read_connection` answers every
+  section, as before.
+- **The pins**: `meridian` 0.1.50, which reads the pages the SDK declares in
+  `role-pages`; open-meridian 0.31.1 and plugin-python:0.31.1 by digest, as
+  0.12.0.
+
 ## 0.12.0
 
 On open-meridian 0.31.1, contract 26.

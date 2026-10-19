@@ -306,3 +306,31 @@ def test_a_fills_price_from_two_averages() -> None:
     price, rounded = fill_price(Decimal(1), Decimal(1), Decimal(4), Decimal("1.1"), 8)
     assert rounded and price == Decimal("1.13333333")
     assert execution_id("syn-ord-1", Decimal("4.0")) == "syn-ord-1:4"
+
+
+def test_the_catalogue_carries_the_environment_the_session_reached() -> None:
+    """Contract v26 (G1 question 5): the agents' demo-only guard's second key.
+    The simulated brokerage reaches no venue, so it reports `paper`."""
+    recorder = Recorder("alpaca")
+    rig = Rig(recorder)
+    run(rig.trader.start())
+    catalogue = recorder.on("ReportVenueCatalogue")[-1].catalogue
+    assert catalogue.venue_account_code == CODE and catalogue.environment == "paper"
+
+
+def test_the_environment_is_read_from_the_host_the_trading_api_is_called_at(
+    tmp_path: Path,
+) -> None:
+    """`paper-api.alpaca.markets` is paper, `api.alpaca.markets` live, and any
+    other host no report, which the guard counts live. Nothing is sent: the
+    venue is only constructed."""
+    from alpaca.broker import LIVE_BASE, PAPER_BASE, Broker
+    from alpaca.kinds import Store
+    from alpaca.venue import AlpacaVenue
+
+    def reached(base: str) -> str:
+        return AlpacaVenue(Broker(Store(tmp_path), None, base, keyless=True)).environment
+
+    assert reached(PAPER_BASE) == "paper"
+    assert reached(LIVE_BASE) == "live"
+    assert reached("https://paper-api.example.com") == ""

@@ -22,6 +22,7 @@
 | You see | It means | Do |
 |---|---|---|
 | Statements: **needs sign-in** | Alpaca refused the API key | Check it at Alpaca, or make a new one and enter it in Settings |
+| The plugin does not start after upgrading | Environment holds Sandbox, its name before 0.12.0 | Save Environment again as Paper in Settings |
 | Statements: **disabled** | Alpaca says the account is closed or blocked | Raise it with Alpaca |
 | Statements: **stale** | Alpaca has not answered for longer than Stale after | Nothing, usually: the next read catches up |
 | An account readers cannot see | It is not linked, or they hold no grant on the account it is linked to | Link it on Account links; a deployment admin grants read or write |
@@ -34,4 +35,5 @@
 | An order type or time in force rejected | Alpaca's catalogue does not offer it | Choose one the catalogue lists on Trading |
 | A fill waits | It is sent only with its settlement date, from the deployment's date read | Nothing: it is asked about again on each read |
 | A fill on no order | An order placed in Alpaca's own app filled | The desk accepts it to an order or answers it DK |
+| An agent's order refused as live | The connection is not Demo: Environment is Live, or the session reached Alpaca's live host | Agents trade only on Paper; a person places live orders |
 | Orders **held** | A pause or a stop is in force | Lift it; a stop also cancelled what was working |

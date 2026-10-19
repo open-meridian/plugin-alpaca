@@ -221,7 +221,7 @@ async def watch_settings(
                 # The built-in exchange's listings, as a source's own list.
                 await state.lake.seed(sorted(exchange()["bars"]))
         if account is not None and account.use(state.config):
-            state.updates = account.updates
+            state.updates, state.venue = account.updates, account.venue
             if woken is not None:
                 woken.set()
         configured.set()

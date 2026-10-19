@@ -20,12 +20,15 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.11.0, on open-meridian 0.30.0 (contract 25): its connectivity
-work the SDK's (`meridian.roles.connectivity`); its whole declaration,
+**Status:** 0.12.0, on open-meridian 0.31.0 (contract 26): its connectivity
+work the SDK's (`meridian.roles.connectivity`), and from 0.12.0 its listings
+in the lake too (`meridian.roles.data.listings`); the environment its
+session reached on its venue catalogue, the agents' demo-only guard's second
+key; its whole declaration,
 and its documentation in [docs/](docs/), which a deployment shows on its
 Documentation tab; the daily dataset names the US equity
 calendar (contract 24's `calendar_id`). Not released; its pins are the
-released SDK, CLI and core v25 (abf028f), by tag and digest.
+released SDK, CLI and core v26 (17a13a2), by tag and digest.
 
 ## What it serves
 
@@ -142,11 +145,14 @@ the key decides which account connectivity trades.
    account's to trade with simulated money, the live account's to trade
    for real. Alpaca shows the secret key once.
 2. In the deployment, open the plugin under **Manage**, then **Settings**.
-3. Choose **Environment**: **Sandbox** is Alpaca's paper trading API
+3. Choose **Environment**: **Paper** is Alpaca's paper trading API
    (paper-api.alpaca.markets), simulated money; **Live** is its live
-   Trading API (api.alpaca.markets). It must match the key. It is Sandbox
-   until a person chooses Live (from 0.9.0): neither an upgrade nor an
-   Environment never saved turns the plugin Live.
+   Trading API (api.alpaca.markets). It must match the key. It is Paper
+   until a person chooses Live: neither an upgrade nor an Environment never
+   saved turns the plugin Live. Agents may place orders only on Paper (the
+   agents' demo-only guard, contract v26). Before 0.12.0 Paper was called
+   Sandbox: on upgrading, save Environment again as Paper, or the plugin
+   does not start.
 4. Enter the **API key ID** and the **API secret key**. Both are secret
    settings: once saved they are never shown again, logged, put on a page or
    sent anywhere but Alpaca.

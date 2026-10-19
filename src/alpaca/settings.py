@@ -13,17 +13,20 @@ what it is.
 From 0.8.0 the plugin holds three roles (data, custody, connectivity), and
 every setting names the roles it serves:
 
-- `environment` first, a required choice, the common setting's name, label
-  and values: `live`, Alpaca's live Trading API (api.alpaca.markets), or
-  `sandbox`, Alpaca's paper trading API (paper-api.alpaca.markets), the
-  same API with simulated money. It decides which account custody reads
-  and connectivity trades. Market data is one service whichever it is, and
-  either account's key reads it. From 0.8.1 it defaults to `sandbox`, not
-  the common setting's `live`, so Live is only ever a person's choice (the
-  product owner, 2026-10-14): an upgrade or an unset value never turns the
-  plugin Live.
+- `environment` first, the common setting (`meridian.environment`):
+  `live`, Alpaca's live Trading API (api.alpaca.markets), or from 0.12.0
+  `paper` ("Paper", Alpaca's own word; contract v26, G1 question 4),
+  Alpaca's paper trading API (paper-api.alpaca.markets), the same API with
+  simulated money. Before 0.12.0 the paper value was `sandbox`: the SDK
+  refuses a saved value its choices do not hold, so Environment is saved
+  again as Paper on upgrading. It decides which account custody reads and
+  connectivity trades. Market data is one service whichever it is, and
+  either account's key reads it. It defaults to `paper`, so Live is only
+  ever a person's choice (the product owner, 2026-10-14). It is one key of
+  the agents' demo-only guard: a connection is demo while this says `paper`
+  and the session reached Alpaca's paper host (venue.py).
 - the key's two parts, for whichever environment is chosen: a live
-  account's key on `live`, a paper account's on `sandbox`. One key, as
+  account's key on `live`, a paper account's on `paper`. One key, as
   before, so a value saved under 0.6.x carries over unchanged.
 - custody's "Read every" and "Stale after" (`meridian.roles.custody`), from
   0.8.0.
@@ -44,7 +47,7 @@ import meridian
 from meridian.roles import custody
 
 ENVIRONMENT = "environment"
-LIVE, SANDBOX = "live", "sandbox"
+LIVE, PAPER = "live", "paper"
 KEY_ID = "alpaca_api_key_id"
 SECRET_KEY = "alpaca_api_secret_key"
 POLL_SECONDS = "poll_seconds"
@@ -62,7 +65,7 @@ DEFAULT_STALE_AFTER_HOURS = 36
 #: What the plugin says of each environment, wherever it says which.
 SAID = {
     LIVE: "Live: Alpaca's live Trading API",
-    SANDBOX: "Paper: Alpaca's paper trading API, simulated money",
+    PAPER: "Paper: Alpaca's paper trading API, simulated money",
 }
 
 
@@ -71,17 +74,15 @@ class Declared:
     """The settings as declared, in the roles' order: one typed class, the
     SDK's form, which `connect` and the declaration register."""
 
-    # The common setting `environment` (meridian.environment), its name,
-    # label and values, but Sandbox by default: Live is a person's choice.
-    environment: str = meridian.setting(
-        "Environment",
-        required=True,
-        default=SANDBOX,
-        choices=(meridian.Choice(LIVE, "Live"), meridian.Choice(SANDBOX, "Sandbox")),
+    # The common setting `environment` (meridian.environment), its demo
+    # `paper` in Alpaca's word, Paper, and Paper until a person chooses Live.
+    environment: str = meridian.environment(
+        demo=PAPER,
         description=(
-            "Live: Alpaca's live Trading API, with a live account's key. Sandbox: Alpaca's "
+            "Live: Alpaca's live Trading API, with a live account's key. Paper: Alpaca's "
             "paper trading API, simulated money, with a paper account's key. Market data "
-            "reads the same either way. Sandbox until a person chooses Live."
+            "reads the same either way. Paper until a person chooses Live. Agents may place "
+            "orders only on Paper."
         ),
         roles=EVERY_ROLE,
     )
@@ -92,7 +93,7 @@ class Declared:
         roles=EVERY_ROLE,
         description=(
             "From Alpaca's dashboard, under API keys: the live account's for Live, the paper "
-            "account's for Sandbox. It must match Environment."
+            "account's for Paper. It must match Environment."
         ),
     )
     alpaca_api_secret_key: str = meridian.setting(
@@ -152,13 +153,15 @@ class Credentials:
 class Config:
     """The settings as the plugin uses them: the environment, the key, if both
     parts are given, which parts are set (never their values), custody's
-    cadence, and sample data."""
+    cadence, and sample data; and the environment setting as delivered, the
+    agents' guard's first key."""
 
     credentials: Credentials | None = None
     key_id_set: bool = False
     secret_key_set: bool = False
     sample_data: bool = False
-    environment: str = SANDBOX
+    environment: str = PAPER
+    environment_setting: str = PAPER
     poll_seconds: int = DEFAULT_POLL_SECONDS
     stale_after: timedelta = timedelta(hours=DEFAULT_STALE_AFTER_HOURS)
 
@@ -170,13 +173,12 @@ class Config:
     @property
     def paper(self) -> bool:
         """Whether the account is Alpaca's paper account (simulated money)."""
-        return self.environment == SANDBOX
+        return self.environment == PAPER
 
 
 def config_from(values: Mapping[str, object]) -> Config:
-    """The settings as delivered, typed: Live only where it is chosen, the
-    sandbox otherwise, the declared default the SDK fills in while it is
-    unset."""
+    """The settings as delivered, typed: Live only where it is chosen, Paper
+    otherwise, the declared default the SDK fills in while it is unset."""
     key_id, secret_key = str(values.get(KEY_ID) or ""), str(values.get(SECRET_KEY) or "")
     poll, stale = values.get(POLL_SECONDS), values.get(STALE_AFTER_HOURS)
     return Config(
@@ -184,7 +186,8 @@ def config_from(values: Mapping[str, object]) -> Config:
         key_id_set=bool(key_id),
         secret_key_set=bool(secret_key),
         sample_data=values.get(SAMPLE_DATA) is True,
-        environment=LIVE if values.get(ENVIRONMENT) == LIVE else SANDBOX,
+        environment=LIVE if values.get(ENVIRONMENT) == LIVE else PAPER,
+        environment_setting=str(values.get(ENVIRONMENT) or PAPER),
         poll_seconds=(
             max(poll, LEAST_POLL_SECONDS)
             if isinstance(poll, int) and not isinstance(poll, bool)

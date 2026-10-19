@@ -3,7 +3,7 @@ run unchanged against this plugin: every case mapped to the plugin's own
 conversion, from Alpaca's recorded exchange and stream, through the lake's half it runs in
 production (lake.py), against the suite's `Recorder`.
 
-Nine cases are not presented, each with why (`NOT_PRESENTED`). Two are
+Eleven cases are not presented, each with why (`NOT_PRESENTED`). Two are
 about kinds of data Alpaca's US stock data never publishes (`about`, from
 contract v19): a currency's rate against another currency, and a crypto
 asset's price (its crypto is left to the crypto pair). Two are about a field
@@ -16,6 +16,12 @@ close in New York as Alpaca states it, and never reads a settlement calendar
 or asks for a settlement date. And from contract v23, three are about an
 event contract's outcomes (`about` outcomes), which Alpaca's stock data never
 states. Every other case about trades is presented.
+
+From contract v26, two more are about outcomes: an event's group, and a flag
+the venue leaves unstated. `queries-the-lake-within-bounds` is mapped as
+the SDK's data template maps it: one bounded query of a kind the role
+reads, trades, of a listing it records (`lake_query`); the plugin itself
+asks the lake nothing. The event group heard and read is the SDK's.
 """
 
 from __future__ import annotations
@@ -29,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from meridian.plugin.v1 import operations_pb2 as ops
+from meridian.roles.data.testing import lake_query
 from meridian.suites import Recorder, run
 
 from alpaca import convert
@@ -72,6 +79,12 @@ NOT_PRESENTED = {
         "Alpaca's stock data lists no event contract, so states no outcome"
     ),
     "records-a-partial-payout": "Alpaca's stock data lists no event contract, so states no outcome",
+    # Contract v26: an event's group and the flags a venue leaves unstated are
+    # about outcomes too.
+    "reports-an-event-group": "Alpaca's stock data lists no event contract: no event to group",
+    "reports-a-flag-the-venue-does-not-state": (
+        "Alpaca's stock data lists no event contract: no event whose flags go unstated"
+    ),
 }
 
 #: A moment in the session, for the stream's messages.
@@ -299,6 +312,9 @@ def producers(tmp: Path) -> dict[str, Producer]:
         "a-trade-recorded": standing_streamed,
         "a-restarts-gap-backfilled": restarted,
         "reads-its-datasets-licences": licences,
+        # Contract v26: one bounded query of a kind the role reads, of a
+        # listing it records, as the SDK's data template maps it.
+        "queries-the-lake-within-bounds": lake_query(SPY, "trades"),
     }
 
 
@@ -306,7 +322,13 @@ def test_the_data_suite_passes_unchanged(tmp_path: Path) -> None:
     report = run("data", producers(tmp_path), not_presented=NOT_PRESENTED)
     assert report.passed, report.failures
     # Contract v24: and the two cases every suite holds, which the SDK answers.
-    assert len(report.passed_cases) == 22
+    # Contract v26: the bounded lake query, and the event group the SDK answers.
+    assert len(report.passed_cases) == 24
+    assert report.answered_by_sdk == [
+        "hears-and-reads-a-replacement",
+        "reads-the-template-catalogue",
+        "hears-and-reads-an-event-group",
+    ]
     assert sorted(report.not_presented) == sorted(NOT_PRESENTED)
 
 

@@ -34,8 +34,14 @@ as for every plugin.
 - `src/alpaca/page.py` and `records.py`: the data role's Connection and
   Datasets (spec/plugin-pages-follow-their-role), under Manage, each a read
   tool (`read_connection`, `read_datasets`) answering the role's common
-  fields, `meridian.roles.data`'s records extended with Alpaca's. Their
-  templates extend the role's and add Alpaca's nuance at its blocks alone
+  fields, `meridian.roles.data`'s records extended with Alpaca's. From
+  0.13.0 Connection is one page for data and connectivity, the SDK's
+  (`connectivity.connection_pages`, ruling 457): connectivity's sections are
+  the SDK's (`meridian/roles/connectivity/_sections.html`) under its Trading
+  tab, `read_connection` answering them as `trading`; and Raw records is
+  the SDK's (`raw_records_page`). Never copy an SDK page, record or template
+  into the plugin (rulings 202 and 457). Datasets' template extends the
+  role's and adds Alpaca's nuance at its blocks alone
   (`vendor_notices`, `vendor_rows`, `vendor_columns`, `vendor_sections`):
   never rename, reorder or drop a common section, row, column or label. No
   page shows a price: prices are the reading roles', under their
@@ -51,8 +57,11 @@ as for every plugin.
   enabling trading and the catalogue. `venue.py` is Alpaca's words for it,
   `broker.py` the one module that speaks to the Trading API (paper or live,
   every exchange a raw record first, `kinds.py`), `updates.py` the trade
-  updates stream, `trading_page.py` the Trading page (the SDK's `trading_read`
-  and template) and Raw records. From 0.8.0 an order placed in Alpaca's own
+  updates stream. From 0.13.0 the adapter declares its placement types
+  (`placement_types`: DMA alone, Alpaca takes no RFQ) and reads each order in
+  the account's currency, by which an order placed in Alpaca's own app is
+  resolved; the Trader records the Trading API's session latency
+  (`roles.Latency`, shown on Connection, not yet reported). From 0.8.0 an order placed in Alpaca's own
   app has its fills reported on no placement (`Originated`, `Watched`:
   `trading/originated.json`), and the placement an accept creates is followed
   for its later fills.
@@ -60,7 +69,7 @@ as for every plugin.
   positions, cash and activities read from the Trading API and reported
   (`Syncer`), every value closed rather than read carrying its provenance;
   `custody_pages.py` the Account links, Statements and History pages: from
-  0.12.1 the SDK's (`meridian.roles.custody.account_pages`), the module
+  0.12.1 the SDK's, from 0.13.0 in the role's templates (`meridian.roles.custody.account_pages`), the module
   keeping only what Alpaca's sync holds (a `Source`).
 - `src/alpaca/synthetic_broker.py`: a simulated brokerage behind the Trading
   API's shapes, a symbol for each answer (`SYNREJ`, `SYNLOST`, `SYNODD`,

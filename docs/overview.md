@@ -13,7 +13,7 @@ It serves three datasets:
 - **Daily** (`alpaca:daily`): each listing's close and daily bar for a
   business date, from Alpaca's consolidated tape (SIP). A date is New York's
   trading day, final at the 16:00 close; until then the day is still forming,
-  and is updated in place as it fills. Daily prices are read when a plugin
+  updated in place as it fills. Daily prices are read when a plugin
   asks for them, and each evening the closes of every listing already served
   are recorded unasked.
 - **Live** (`alpaca:live`): the latest trade's price and the best bid and
@@ -33,6 +33,11 @@ It serves three datasets:
 Every price is exact, as Alpaca stated it. Every response Alpaca sent is kept
 in the plugin's own storage, without your key, so any price can be traced to
 what Alpaca said.
+
+Alpaca's consolidated history is asked 16 minutes behind real time, past a
+free account's restriction, so the daily dataset declares that delay: a day
+still forming is judged stale only past it. Live prices and trades are real
+time.
 
 It does not serve Alpaca's crypto or options data, and it trades no
 options. Alpaca does not say which side of a
@@ -59,5 +64,12 @@ Alpaca did with each: acknowledged, rejected, replaced, cancelled, filled.
 Alpaca's trade updates stream reports each fill, and the plugin reads the orders every 15 seconds besides, so a fill missed while the stream was down is found. Every fill carries the deployment's settlement date for it, and
 waits for it rather than go with a guess. An order placed in Alpaca's own app is
 never recorded as an order: its fills are reported on no order, for your
-execution plugin to accept or answer DK. A new account is read-only until
-the connectivity role's admin enables trading on it.
+execution plugin to accept or answer DK; its instrument is found by its
+symbol and the account's currency (USD), the fills priced in it. A new
+account is read-only until the connectivity role's admin enables trading
+on it.
+
+Every order is placed directly at Alpaca: it takes no request for quote, so
+an RFQ placement is rejected as unsupported, as is a good-till-date order,
+nothing sent. The time each call to Alpaca takes, an order's
+acknowledgement and a fill's delay are shown on Connection.

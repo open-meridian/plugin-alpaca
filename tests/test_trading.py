@@ -155,6 +155,10 @@ def test_a_replace_the_catalogue_lacks_is_refused_with_nothing_sent() -> None:
     assert refused.event == ops.PLACEMENT_EVENT_REJECTED
     assert refused.rejection_reason == ops.REJECTION_REASON_UNSUPPORTED
     assert not [a for a in rig.brokerage.asked if a[0] == "PATCH"]
+    # SDK 0.32.0: its raw record names the venue account, as a placement's
+    # rejection does.
+    kept = rig.store.get(refused.raw_record.key)
+    assert kept is not None and kept["venue_account_code"] == CODE
 
 
 def test_a_cancel_is_sent_and_the_next_read_reports_it() -> None:
@@ -258,6 +262,12 @@ def test_an_order_placed_in_alpacas_app_has_its_fills_reported_on_no_placement(
     ]
     assert sorted(as_decimal(f.quantity) for f in fills) == [Decimal(2), Decimal(3)]
     assert all(f.venue_client_order_id.startswith("alpaca-app-") for f in fills)
+    # SDK 0.32.0: its instrument resolved by its symbol and the currency
+    # Alpaca states the account in, its fills priced in it.
+    (resolved,) = recorder.on("ResolveIdentifier")
+    assert [(i.scheme, i.value) for i in resolved.identifiers] == [("symbol", "AAPL")]
+    assert resolved.stated_currency == "USD"
+    assert all(f.price.currency_code == "USD" for f in fills)
     rig.watched = Watched(tmp_path / "trading" / "originated.json")
     rig.trader = rig.make()
     run(rig.trader.start())
@@ -306,6 +316,36 @@ def test_a_fills_price_from_two_averages() -> None:
     price, rounded = fill_price(Decimal(1), Decimal(1), Decimal(4), Decimal("1.1"), 8)
     assert rounded and price == Decimal("1.13333333")
     assert execution_id("syn-ord-1", Decimal("4.0")) == "syn-ord-1:4"
+
+
+def test_alpaca_takes_dma_alone_and_an_rfq_is_unsupported_with_nothing_sent() -> None:
+    """Contract v27 (W11.20): the catalogue lists DMA alone, and an RFQ
+    placement is rejected unsupported before anything reaches Alpaca."""
+    recorder = Recorder("alpaca")
+    rig = Rig(recorder)
+    run(rig.trader.start())
+    catalogue = recorder.on("ReportVenueCatalogue")[-1].catalogue
+    assert list(catalogue.placement_types) == [ops.PLACEMENT_TYPE_DMA]
+    held = placement(placement_type=ops.PLACEMENT_TYPE_RFQ)
+    rig.holds(held)
+    run(rig.hear(held))
+    refused = recorder.on("ReportPlacement")[-1]
+    assert refused.event == ops.PLACEMENT_EVENT_REJECTED
+    assert refused.rejection_reason == ops.REJECTION_REASON_UNSUPPORTED
+    assert not [a for a in rig.brokerage.asked if a[0] == "POST"]
+
+
+def test_a_good_till_date_order_is_unsupported_with_nothing_sent() -> None:
+    """Alpaca takes no expiry: a good-till-date placement, its expiry on the
+    order (SDK 0.32.0's `Asked.expire_date`), is rejected unsupported."""
+    recorder = Recorder("alpaca")
+    rig = Rig(recorder)
+    held = placement(tif=ops.TIME_IN_FORCE_GOOD_TILL_DATE)
+    rig.holds(held)
+    run(rig.hear(held))
+    refused = recorder.on("ReportPlacement")[-1]
+    assert refused.rejection_reason == ops.REJECTION_REASON_UNSUPPORTED
+    assert not [a for a in rig.brokerage.asked if a[0] == "POST"]
 
 
 def test_the_catalogue_carries_the_environment_the_session_reached() -> None:

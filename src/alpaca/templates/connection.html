@@ -1,30 +1,54 @@
-{#- Connection, at admin: the data role's sections -- "Key", "Limits and
-    use" and "Stream", as meridian/roles/data/connection.html draws them --
-    one at a time under a tab row (`tab`: key, limits or stream), so the
-    page fits one screen with the stream's session showing; with Alpaca's
-    nuance: the head's status, a line saying which feed each dataset reads,
-    what the key is not entitled to under "Key", and the stream's session
-    under "Stream". read_connection answers every section at once. Never a
-    key's value; no market data. -#}
+{#- Connection, at admin, one page for the data role and connectivity (457;
+    `meridian.roles.connectivity.connection_pages`): the data role's sections
+    -- "Key", "Limits and use" and "Stream", as
+    meridian/roles/data/connection.html draws them -- then connectivity's,
+    as the SDK's meridian/roles/connectivity/_sections.html draws them
+    ("Environment", "Accounts", "Placements", and "Sessions" once a session
+    is measured), one tab at a time under a tab row (`connection_tab()`:
+    key, limits, stream or trading), so the page fits one screen. With
+    Alpaca's nuance: the head's status, a line saying which feed each
+    dataset reads, what the key is not entitled to under "Key", the stream's
+    session under "Stream", and the trade updates stream under
+    "Placements". read_connection answers every section at once. Never a
+    key's value; no market data; no account's data. -#}
 {% extends "meridian/base.html" %}
+{% import "meridian/kit.html" as kit %}
 {% import "meridian/roles/_rows.html" as om %}
-{% block status %}<om-status data-om-header state="{{ head.state }}" label="{{ head.label }}">{{ head.label }}</om-status>{% endblock %}
+{% block status %}{% set head = connection_status(data) %}<om-status data-om-header state="{{ head.state }}" label="{{ head.label }}">{{ head.label }}</om-status>{% endblock %}
 {% block content %}
+{% set tab = connection_tab() %}
 {% if data.mode == "No key" %}
 {{ om.next_step("No key yet", "Enter it in", "settings", "Settings") }}
 {% elif data.mode == "Sample data" %}
 <div class="notice info" role="status">Sample data: the plugin answers from recorded responses; the vendor is not called.</div>
 {% endif %}
 {% if data.last_error %}<div class="notice bad" role="alert">{{ data.last_error }}</div>{% endif %}
-{% if data.environment_to_save %}<div class="notice warn" role="status">Environment holds "{{ data.environment_to_save }}", no longer offered: save it again in <a href="#settings" data-om-opens="settings">Settings</a>.</div>{% endif %}
+{% if notice is defined and notice %}<div class="notice good" role="status">{{ notice }}</div>{% endif %}
+{% set trading = data.trading %}
+{% if trading and trading.environment_to_save %}<div class="notice warn" role="status">Environment holds "{{ trading.environment_to_save }}", no longer offered: save it again in <a href="#settings" data-om-opens="settings">Settings</a>.</div>{% endif %}
+{% if trading and trading.badge %}<p class="hint">Connection {% if trading.badge == "Demo" %}{{ kit.badge("Demo", "good") }}{% elif trading.badge == "Live" %}{{ kit.badge("Live", "warn") }}{% else %}{{ kit.badge(trading.badge, "bad") }}{% endif %}<span class="wide-only"> The session reached {{ venue }}'s {{ trading.reached_environment }} host; agents may place orders only on a Demo connection.</span></p>{% endif %}
 <p class="muted wide-only">{% if data.mode == "Live" %}{{ data.detail }} {% endif %}Closes and daily bars from SIP; live prices, quotes and trades from {{ data.live_feed|upper }}, streamed while wanted.</p>
 <nav class="tabs" aria-label="Connection">
-{%- for key, title in tabs %}
+{%- for key, title in connection_tabs if key != "trading" or trading %}
 <a class="tab{% if key == tab %} on{% endif %}" href="?tab={{ key }}"{% if key == tab %} aria-current="page"{% endif %}>{{ title }}</a>
 {%- endfor %}
 </nav>
+{% if tab == "trading" and trading %}
+{% set merged = true %}
+{% set updates_label = "Trade updates" %}
+{% set updates_none = "Not streaming" %}
+{% include "meridian/roles/connectivity/_sections.html" %}
+{% if trading.session_latency %}
 <section class="panel">
-<table class="one-line" aria-label="{{ (tabs|selectattr(0, 'equalto', tab)|first)[1] }}"><tbody>
+<h2>Sessions</h2>
+<table class="one-line"><tbody>
+{{ om.session_rows(trading.session_latency) }}
+</tbody></table>
+</section>
+{% endif %}
+{% else %}
+<section class="panel">
+<table class="one-line" aria-label="{{ (connection_tabs|selectattr(0, 'equalto', tab)|first)[1] }}"><tbody>
 {% if tab == "key" %}
 {{ om.row("Mode", data.mode, {"Live": "The vendor's live service.", "Sample data": "Recorded responses; the vendor is not called.", "No key": "Nothing is read until a key is entered in Settings."}.get(data.mode, "")) }}
 {% set key %}{% for each in data.credentials %}{{ each.label }}: {{ "set" if each.set else "not set" }}{% if not loop.last %}; {% endif %}{% endfor %}{% endset %}
@@ -47,4 +71,5 @@
 {% endif %}
 </tbody></table>
 </section>
+{% endif %}
 {% endblock %}

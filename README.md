@@ -20,21 +20,27 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.12.1, on open-meridian 0.31.1 (contract 26): its connectivity
-work the SDK's (`meridian.roles.connectivity`), and from 0.12.0 its listings
-in the lake too (`meridian.roles.data.listings`); the environment its
-session reached on its venue catalogue, the agents' demo-only guard's second
-key; its whole declaration,
-and its documentation in [docs/](docs/), which a deployment shows on its
-Documentation tab; the daily dataset names the US equity
+**Status:** 0.13.0, on open-meridian 0.32.2 (contract 27): one Connection
+for market data and orders, the SDK's (`connection_pages`, ruling 457), and
+Raw records the SDK's, no page or template copied between plugins (rulings
+202 and 457); the placement types it takes declared (DMA alone: Alpaca takes
+no request for quote); the daily dataset's delay declared (16 minutes); the
+Trading API's session latency recorded and shown. Its connectivity work is
+the SDK's (`meridian.roles.connectivity`), its listings in the lake too
+(`meridian.roles.data.listings`); the environment its session reached on its
+venue catalogue, the agents' demo-only guard's second key; its whole
+declaration, and its documentation in [docs/](docs/), which a deployment
+shows on its Documentation tab; the daily dataset names the US equity
 calendar (contract 24's `calendar_id`). Not released; its pins are the
-released SDK, CLI and core v26 (17a13a2), by tag and digest.
+released SDK, CLI 0.1.52 and core v27 (a5da59a), by tag and digest. The
+stream's liveness follows on open-meridian 0.32.3, whose listings feed
+records it.
 
 ## What it serves
 
 | Dataset | What | From | Arrives | Default terms |
 |---|---|---|---|---|
-| `daily` | each listing's close and daily bar (open, high, low, close, volume, VWAP, trade count) for a business date, New York's day ending at the 16:00 close | Alpaca's consolidated history (SIP), past the free plan's restricted latest 15 minutes | pulled when a reader's read is wanted; pushed once a session's close is final, for the listings it has served | kept; personal use |
+| `daily` | each listing's close and daily bar (open, high, low, close, volume, VWAP, trade count) for a business date, New York's day ending at the 16:00 close | Alpaca's consolidated history (SIP), past the free plan's restricted latest 15 minutes: a declared delay of 16 minutes | pulled when a reader's read is wanted; pushed once a session's close is final, for the listings it has served | kept; personal use |
 | `live` | the latest trade's price (`last`), the best bid and ask; the best bid and offer as a quote, with its sizes | SIP where the key has it in real time (Algo Trader Plus), else IEX, the one exchange a free account sees | pulled for a read; while a standing want stands, prices kept current once a minute and quotes streamed, at most one a second per listing | served, not kept; personal use |
 | `trades` | each trade with the platform's trade attributes, converted from its conditions | the same feed as `live` | streamed for the listings under a standing want; pulled for a range a reader wants | kept two days; personal use |
 

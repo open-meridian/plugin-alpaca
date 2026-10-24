@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.13.0
+
+On open-meridian 0.32.2, contract 27.
+
+- **One Connection for market data and orders** (ruling 457): Connection is
+  the SDK's `connectivity.connection_pages`, connectivity's sections
+  (Environment, Accounts, Placements, and Sessions once measured) under a
+  Trading tab beside Key, Limits and use and Stream, so the page fits one
+  screen; "Enable trading" is made on it (`/enable-trading`).
+  `read_connection` answers them as `trading`. **The Trading page and
+  `read_trading` are gone**; `enable_trading` and `check_enable_trading`
+  keep their names. The Environment-to-save notice is `trading`'s
+  (`read_connection`'s top-level `environment_to_save` moved there).
+- **No copied code between plugins** (rulings 202 and 457): `trading_page.py`
+  and the plugin's own `trading.html`, `account_links.html` and
+  `raw_records.html` are deleted. Raw records is the SDK's
+  `raw_records_page`, and Account links the role's own template (its notice
+  and plain form per account are the SDK's from 0.32.0). The plugin's
+  `TradingRead` is gone: the SDK's carries the badge.
+- **Placement types** (contract v27, W11.20): the adapter declares DMA alone
+  (`placement_types`); Alpaca takes no request for quote, so an RFQ
+  placement is rejected `unsupported` with nothing sent, and the catalogue
+  lists DMA.
+- **The trader's fixes from SDK 0.32.0:** each order is read in the
+  currency Alpaca states the account in, so an order placed in Alpaca's own
+  app is resolved by its symbol and that currency, its fills priced in it
+  (tested); a rejected replace's raw record names the venue account
+  (tested). Alpaca takes no good-till-date or good-till-time order, so an
+  `Asked`'s expiry is never sent: such an order is rejected `unsupported`
+  (tested).
+- **Latency (plan §C):** the `daily` dataset declares its delay, 16 minutes
+  (`declared_delay_ns`), the margin past a free account's restricted 15
+  minutes at which SIP's history is asked; `live` and `trades` are real
+  time. The Trader records the Trading API session's round trip, order
+  acknowledgement and fill delay (`roles.Latency`), shown under Sessions;
+  not reported until contract v28 (ruling 515). The suites' three
+  `latency` cases are not presented, "core receives ReportLatency from
+  contract v28, ruling 515" (ruling 518). The stream's liveness
+  (`records-a-datasets-liveness`) follows on open-meridian 0.32.3, whose
+  listings feed records it; not presented until then.
+- **The suites' v27 cases:** the seven rates cases (Alpaca publishes no
+  rates) and an RFQ dealer's quote (it takes no RFQ), not presented with why.
+- **Datasets** fits 1280x800: its line on the terms shortened to one line.
+- **The pins**: open-meridian 0.32.2 and plugin-python:0.32.2 by digest;
+  the core runtime and harness a5da59a by digest (chart 0.1.310); `meridian`
+  0.1.52. The licence's new attribution fields are not set: core v27 refuses
+  a catalogue carrying them; they come in the next version.
+
 ## 0.12.1
 
 - **Custody's pages on the SDK** (ruling 213): Account links, Statements and

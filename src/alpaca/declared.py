@@ -11,14 +11,19 @@ plan's Q21 and Q40 have a source's daily and live data and its trades:
 - `daily`: closes and daily bars, from Alpaca's consolidated (SIP) history;
   its day New York's, ending at the 16:00 close; pulled for a read and
   pushed once a session's close is final; about ten years of history (since
-  2016). Not one venue's: the consolidated view.
+  2016). Not one venue's: the consolidated view. From 0.13.0 (contract v27)
+  it declares its delay, 16 minutes (`declared_delay_ns`): SIP's history is
+  asked past a free account's restricted latest 15 minutes, with a minute's
+  margin, whatever the key's plan, so the day still forming is that far
+  behind; staleness and age are judged against it.
 - `live`: the latest trade's price and the best bid and ask, and from
   contract v19 the best bid and offer as a quote with its sizes, from SIP
   where the key has it in real time, else IEX; pulled for a read; while a
   standing want stands its prices kept current once a minute and its quotes
   streamed. Each row names the exchange it is from, resolved to the venue
   master's ID; the catalogue, written in code before any venue is resolved,
-  names none.
+  names none. Real time (no declared delay): IEX's, or SIP's where the key
+  has it in real time.
 - `trades` (contract v19): each trade with its attributes, from the same
   feed, streamed for the listings under a standing want and pulled for a
   range; apart from the live prices (the plan's Q40), so an admin licenses
@@ -51,6 +56,7 @@ from meridian import DatasetDeclaration, DatasetLicence
 from .convert import DAY_END_MINUTE
 from .kinds import KINDS
 from .lake import DAILY, LIVE, LIVE_CADENCE_SECONDS, TRADES
+from .vendor import SIP_DELAY_NS
 
 VENDOR = "Alpaca"
 #: How long a raw record is kept at the most: the longest kind's window.
@@ -86,6 +92,7 @@ CATALOGUE = (
         day_time_zone="America/New_York",
         day_end_minute=DAY_END_MINUTE,
         calendar_id=US_EQUITY_CALENDAR,
+        declared_delay_ns=SIP_DELAY_NS,
     ),
     DatasetDeclaration(
         key=LIVE,

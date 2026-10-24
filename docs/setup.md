@@ -13,7 +13,7 @@ In Alpaca's dashboard, under API keys, generate a key: the paper account's to tr
 
 **Manage → Settings.**
 
-1. **Environment**, first: **Paper** is Alpaca's paper trading API, simulated money; **Live** is its live Trading API. It must match the key. It is Paper until a person chooses Live. Agents may place orders only on Paper. Upgrading from 0.11.0 or earlier, where it was called Sandbox, save it again as Paper: until then Connection and Trading say so.
+1. **Environment**, first: **Paper** is Alpaca's paper trading API, simulated money; **Live** is its live Trading API. It must match the key. It is Paper until a person chooses Live. Agents may place orders only on Paper. Upgrading from 0.11.0 or earlier, where it was called Sandbox, save it again as Paper: until then Connection says so.
 2. The **API key ID** and the **API secret key**. Secret settings: once saved
    they are never shown again, logged, put on a page or sent anywhere but
    Alpaca.
@@ -44,10 +44,13 @@ statements under View or Open.
 
 A deployment admin makes the plugin available to the desk's execution
 plugin, whose admin links it and maps a book account to the account's
-venue account code, shown on **Trading**. A new account is read-only:
-every order on it is rejected as unsupported, nothing sent, until the
-connectivity role's admin presses **Enable trading** on Trading. Its
-catalogue is then published: `market` and `limit`, each day, GTC, IOC or FOK; `stop` and `stop_limit`, each day or GTC. Alpaca takes no good-till-date order.
+venue account code, shown on **Connection**'s Trading tab. A new account
+is read-only: every order on it is rejected as unsupported, nothing sent,
+until the connectivity role's admin presses **Enable trading** there. Its
+catalogue is then published: `market` and `limit`, each day, GTC, IOC or
+FOK; `stop` and `stop_limit`, each day or GTC. Alpaca takes no
+good-till-date or good-till-time order, and no request for quote: every
+order is placed directly (DMA).
 
 ## Sample data
 

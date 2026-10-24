@@ -178,4 +178,4 @@ def test_an_environment_saved_before_0_12_0_says_save_it_again() -> None:
     client = PageClient(pages)
     text = client.get(CONNECTION, "admin").text
     assert "no longer offered" in text and "sandbox" in text
-    assert client.call_tool("read_connection").data["environment_to_save"] == "sandbox"
+    assert client.call_tool("read_connection").data["trading"]["environment_to_save"] == "sandbox"

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from meridian.roles import connectivity, data
+from meridian.roles import data
 
 
 @dataclass(frozen=True)
@@ -57,9 +57,6 @@ class ConnectionRead(data.ConnectionRead):
     live_feed: str = ""
     last_status: int = 0
     stream: SessionRead | None = None
-    #: The value Environment was saved as where this version refused it
-    #: (SDK 0.31.1): save it again, as Paper or Live.
-    environment_to_save: str = ""
 
 
 @dataclass(frozen=True)
@@ -101,22 +98,3 @@ class DatasetsRead(data.DatasetsRead):
     streamed: int = 0
     past_limit: int = 0
     declined_today: int = 0
-
-
-# ── Connectivity's, from contract v26 ──────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class TradingRead(connectivity.TradingRead):
-    """Trading, the role's record, with the agents' demo-only guard's second
-    key beside its first (contract v26, W11.8): the environment the session
-    reached, read from Alpaca's host (`live`, `paper`, or empty before
-    anything is reached), and the badge both keys make
-    (`meridian.connection_badge`): Demo, Live, or Live (environment not
-    confirmed) where the setting and the session disagree."""
-
-    reached_environment: str = ""
-    badge: str = ""
-    #: The value Environment was saved as where this version refused it
-    #: (SDK 0.31.1): save it again, as Paper or Live.
-    environment_to_save: str = ""

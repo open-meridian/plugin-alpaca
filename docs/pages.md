@@ -9,7 +9,8 @@ under the same names on every data plugin.
 ## Connection (`read_connection`)
 
 One page for market data and for orders. One section at a time, under a
-tab row (Key, Limits and use, Stream, Trading), so the page fits one screen;
+tab row (Key, Limits and use, Stream, Trading, and Sessions once measured),
+so the page fits one screen;
 `read_connection` answers every section, the orders' under `trading`.
 
 - **Key:** the mode (Live, Sample data or No key); whether the API key ID
@@ -35,9 +36,9 @@ alone (`enable_trading`). The order types its catalogue offers, and whether
 the execution plugin mapped it, are in `read_connection`'s answer.
 **Placements**: how many orders are working, held back by a pause or a stop,
 or of unknown outcome; the last read of the orders and the trade updates
-stream's state. **Sessions**, once measured: each call to the Trading API's
-round trip, an order's acknowledgement and a fill's delay. No account's
-data.
+stream's state. No account's data. **Sessions**, its own tab once measured:
+each call to the Trading API's round trip, an order's acknowledgement and a
+fill's delay.
 
 The **Connection** badge, above the tab row, says whether agents may place
 orders on it: **Demo** where Environment says Paper and the session reached

@@ -3,7 +3,7 @@ run unchanged against this plugin: every case mapped to the plugin's own
 conversion, from Alpaca's recorded exchange and stream, through the lake's half it runs in
 production (lake.py), against the suite's `Recorder`.
 
-Twenty cases are not presented, each with why (`NOT_PRESENTED`). Two are
+Nineteen cases are not presented, each with why (`NOT_PRESENTED`). Two are
 about kinds of data Alpaca's US stock data never publishes (`about`, from
 contract v19): a currency's rate against another currency, and a crypto
 asset's price (its crypto is left to the crypto pair). Two are about a field
@@ -26,7 +26,8 @@ asks the lake nothing. The event group heard and read is the SDK's.
 From contract v27, the seven rates cases (`about` rates), which Alpaca's
 stock data never publishes, and the feed delay reported (`about` latency,
 until contract v28, ruling 518: recorded, never yet reported). The stream's
-liveness waits for open-meridian 0.32.3, whose listings feed records it.
+liveness is presented: from open-meridian 0.32.3 the listings feed records
+it for any message heard, a listing's trading status among them.
 """
 
 from __future__ import annotations
@@ -94,10 +95,6 @@ NOT_PRESENTED = {
     # (about latency; ruling 518).
     **{case: "Alpaca's US stock data publishes no rates" for case in RATES_CASES},
     "reports-its-feed-delay": "core receives ReportLatency from contract v28, ruling 515",
-    # Held for SDK 0.32.3, whose listings feed records a stream's liveness.
-    "records-a-datasets-liveness": (
-        "the SDK's listings feed records a stream's liveness from open-meridian 0.32.3"
-    ),
 }
 
 #: A moment in the session, for the stream's messages.
@@ -181,6 +178,12 @@ def producers(tmp: Path) -> dict[str, Producer]:
         stated = message(T="t", S="SPY", i=9, p="575.47", s=100, c=["@"])
         cancel = message(T="x", S="SPY", i=9, p="575.47", s=100, a="C")
         await streamed(recorder, stated, cancel)
+
+    async def alive(recorder: Recorder) -> None:
+        # Contract v27 (0.32.3's listings feed): a stream message with no price
+        # changed -- a listing's trading status -- is the live dataset's
+        # liveness.
+        await streamed(recorder, message(T="s", S="SPY", sc="T", sm="Trading"))
 
     async def quote(recorder: Recorder) -> None:
         await streamed(
@@ -320,6 +323,7 @@ def producers(tmp: Path) -> dict[str, Producer]:
         "a-condition-not-converted": not_converted,
         "a-trade-withdrawn": withdrawn_trade,
         "a-quote-recorded": quote,
+        "records-a-datasets-liveness": alive,
         "a-one-sided-quote": one_sided,
         "a-standing-want-streamed": standing_streamed,
         "a-trade-recorded": standing_streamed,
@@ -336,7 +340,7 @@ def test_the_data_suite_passes_unchanged(tmp_path: Path) -> None:
     assert report.passed, report.failures
     # Contract v24: and the two cases every suite holds, which the SDK answers.
     # Contract v26: the bounded lake query, and the event group the SDK answers.
-    assert len(report.passed_cases) == 24
+    assert len(report.passed_cases) == 25
     assert report.answered_by_sdk == [
         "hears-and-reads-a-replacement",
         "reads-the-template-catalogue",

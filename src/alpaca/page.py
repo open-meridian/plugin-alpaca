@@ -18,15 +18,14 @@ the data role and connectivity, the SDK's
 Raw records is the SDK's (`raw_records_page`). No Trading page of its own.
 
 Each page fits one screen at 375, 582 and 1280 pixels wide: one-line rows,
-the details a click away, Connection's sections one at a time under a tab
-row, and the standing wants, which grow, drawn the latest few with how many
-there are (the tool answers every one).
+the details a click away, Connection's sections one at a time under the
+SDK's tab row (0.32.3), and the standing wants, which grow, drawn the
+latest few with how many there are (the tool answers every one).
 """
 
 from __future__ import annotations
 
 import datetime as dt
-from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -380,19 +379,6 @@ def figures(state: State) -> list[meridian.Figure]:
     )
 
 
-#: Connection's sections, one at a time under a tab row so the page fits one
-#: screen (`?tab=`): the data role's three, then connectivity's (457); its
-#: tool answers all.
-CONNECTION_TABS = (
-    ("key", "Key"),
-    ("limits", "Limits and use"),
-    ("stream", "Stream"),
-    ("trading", "Trading"),
-)
-#: The tab the request being answered asked for, as connection.html reads it.
-_tab: ContextVar[str] = ContextVar("alpaca.connection_tab", default="key")
-
-
 def environment() -> str:
     """The environment as Connection's Trading says it: Paper (simulated
     money) or Live, or sample data."""
@@ -404,18 +390,15 @@ def environment() -> str:
 
 async def connection_record(request: meridian.Request) -> ConnectionRead:
     """Connection's record, the data role's with Alpaca's fields; the SDK
-    adds connectivity's Trading. The tab asked for is noted for the
-    template; "Enable trading" answers on the Trading tab."""
-    asked = request.query.get("tab", "")
-    if request.path.endswith("/enable-trading"):
-        asked = "trading"
-    _tab.set(asked if asked in dict(CONNECTION_TABS) else CONNECTION_TABS[0][0])
+    adds connectivity's Trading, and from 0.32.3 draws one group at a time
+    under its tab row (`?tab=`)."""
     return connection_read(_state)
 
 
-pages.environment.globals["connection_tab"] = _tab.get
 pages.environment.globals["connection_status"] = lambda read: status(read)
-pages.environment.globals["connection_tabs"] = CONNECTION_TABS
+#: How Placements names the way orders are heard: the trade updates stream.
+pages.environment.globals["updates_label"] = "Trade updates"
+pages.environment.globals["updates_none"] = "Not streaming"
 
 connectivity.connection_pages(
     pages,

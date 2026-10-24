@@ -20,7 +20,7 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.13.0, on open-meridian 0.32.2 (contract 27): one Connection
+**Status:** 0.13.1, on open-meridian 0.32.3 (contract 27): one Connection
 for market data and orders, the SDK's (`connection_pages`, ruling 457), and
 Raw records the SDK's, no page or template copied between plugins (rulings
 202 and 457); the placement types it takes declared (DMA alone: Alpaca takes
@@ -32,9 +32,9 @@ venue catalogue, the agents' demo-only guard's second key; its whole
 declaration, and its documentation in [docs/](docs/), which a deployment
 shows on its Documentation tab; the daily dataset names the US equity
 calendar (contract 24's `calendar_id`). Not released; its pins are the
-released SDK, CLI 0.1.52 and core v27 (a5da59a), by tag and digest. The
-stream's liveness follows on open-meridian 0.32.3, whose listings feed
-records it.
+released SDK, CLI 0.1.52 and core v27 (a5da59a), by tag and digest.
+Connection draws one group at a time under the SDK's tab row, and the
+stream's liveness is recorded by the SDK's listings feed.
 
 ## What it serves
 

@@ -38,7 +38,7 @@ as for every plugin.
   0.13.0 Connection is one page for data and connectivity, the SDK's
   (`connectivity.connection_pages`, ruling 457): connectivity's sections are
   the SDK's (`meridian/roles/connectivity/_sections.html`) under its Trading
-  tab, `read_connection` answering them as `trading`; and Raw records is
+  tab (from 0.13.1 the SDK's tab row, no tab code of the plugin's own), `read_connection` answering them as `trading`; and Raw records is
   the SDK's (`raw_records_page`). Never copy an SDK page, record or template
   into the plugin (rulings 202 and 457). Datasets' template extends the
   role's and adds Alpaca's nuance at its blocks alone

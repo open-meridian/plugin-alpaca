@@ -64,12 +64,14 @@ def test_each_page_serves_manage_alone(client: PageClient) -> None:
 
 def test_the_connection_page_and_its_tool_read_one_source(client: PageClient) -> None:
     page = client.get(CONNECTION, "admin").text
-    # The data role's sections, in its order, one at a time under a tab row
-    # (so the page fits one screen), with Alpaca's rows in theirs: Key first.
-    assert page.index(">Key</a>") < page.index(">Limits and use</a>") < page.index(">Stream</a>")
+    # The data role's sections, in its order, one at a time under the SDK's
+    # tab row (0.32.3; so the page fits one screen), with Alpaca's rows in
+    # theirs: Key first.
+    tabs = ("?tab=key", "?tab=limits-and-use", "?tab=stream", "?tab=trading")
+    assert [page.index(t) for t in tabs] == sorted(page.index(t) for t in tabs)
     assert 'href="?tab=key" aria-current="page"' in page
     assert "Sample data" in page and "Not entitled" in page and "100 a minute" not in page
-    limits = client.get(CONNECTION, "admin", tab="limits").text
+    limits = client.get(CONNECTION, "admin", tab="limits-and-use").text
     assert "100 a minute" in limits and "Not entitled" not in limits
     stream = client.get(CONNECTION, "admin", tab="stream").text
     assert "1 listings, since" in stream and "Reconnects" in stream

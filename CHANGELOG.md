@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.13.1
+
+On open-meridian 0.32.3, contract 27.
+
+- **Connection on the SDK's tab row** (0.32.3): the plugin's own tab code is
+  gone, its template extending the role's at its blocks alone (the head's
+  status, the feeds line, "Not entitled" under Key, the stream's session
+  under Stream). The tabs are the SDK's: `?tab=key`, `limits-and-use`
+  (was `limits`), `stream`, `trading`, and `sessions` once a session is
+  measured (Sessions was under Trading). "Enable trading" is no longer
+  clipped at 375 pixels (the SDK's act column).
+- **The stream's liveness is presented** (`records-a-datasets-liveness`):
+  the SDK's listings feed records it for any message heard, no code of the
+  plugin's.
+- **The pins**: open-meridian 0.32.3 and plugin-python:0.32.3 by digest;
+  core a5da59a and `meridian` 0.1.52 as before. The licence fields 0.32.2
+  and 0.32.3 added are still not set: core before 0.1.311 refuses them.
+
 ## 0.13.0
 
 On open-meridian 0.32.2, contract 27.

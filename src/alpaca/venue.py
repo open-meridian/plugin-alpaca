@@ -5,10 +5,17 @@ vocabulary is read.
 **What Alpaca takes** (`POST /v2/orders`, for US equities): `market`,
 `limit`, `stop` and `stop_limit`, each `day` or `gtc`; and `ioc` and `fok`
 for `market` and `limit`. Alpaca takes no good-till-date or good-till-time
-order, so one is rejected `unsupported` before anything is sent. A sell is
+order (its `time_in_force` has no expiry), so one is rejected `unsupported`
+before anything is sent, and an `Asked`'s `expire_date` and
+`expire_time_ns` (SDK 0.32.0) are never read. A sell is
 `sell`, and a short sale too: Alpaca opens a short where a sell is more than
 the account holds, and states no other side. The placement's ID is the
 client order ID, which Alpaca holds unique on the account.
+
+**Its placement types** (contract v27, W11.20): direct to Alpaca alone
+(DMA). Alpaca takes no request for quote -- its equities are traded on its
+order book, with no dealer quoting the firm -- so an RFQ placement is rejected
+`unsupported` before anything is sent (`placement_types`).
 
 **A replace** is `PATCH /v2/orders/{id}`, its quantity, limit and time in
 force; Alpaca answers a new order in the old one's place (`replaces`), and
@@ -30,6 +37,13 @@ outcome unknown, the status as reported.
 venue catalogue: the second key of the agents' demo-only guard, which
 counts a connection demo only while the setting and this both say `paper`.
 The simulated brokerage reaches no venue, so it reports `paper`.
+
+**The currency an order is in** (SDK 0.32.0): Alpaca states every amount of
+the account in the account's own `currency` (USD), and states no other
+identifier than its symbol for an order's instrument (its `asset_id` is
+Alpaca's own, no scheme the platform holds). So each order read carries the
+account's currency, and an order placed in Alpaca's own app is resolved by
+its symbol and that currency, its fills priced in it.
 """
 
 from __future__ import annotations
@@ -116,8 +130,9 @@ def _text(value: Decimal) -> str:
     return format(value.normalize(), "f")
 
 
-def order_of(said: Any) -> VenueOrder:
-    """One of Alpaca's order objects, as the Trader reads it."""
+def order_of(said: Any, currency: str = "") -> VenueOrder:
+    """One of Alpaca's order objects, as the Trader reads it, in the
+    account's `currency` where it is known."""
     held = said if isinstance(said, dict) else {}
     return VenueOrder(
         order_id=str(held.get("id") or ""),
@@ -135,6 +150,7 @@ def order_of(said: Any) -> VenueOrder:
         replaced_by=str(held.get("replaced_by") or ""),
         replaces=str(held.get("replaces") or ""),
         reason=str(held.get("reason") or ""),
+        currency=currency,
     )
 
 
@@ -155,6 +171,8 @@ class AlpacaVenue:
             else meridian.reached_environment(broker.base, live=LIVE_HOSTS, paper=PAPER_HOSTS)
         )
         self._number = ""
+        #: The currency the account states its amounts in, as last read.
+        self.currency = ""
         self._read_at: datetime | None = None
 
     def accounts(self) -> tuple[str, ...]:
@@ -165,11 +183,16 @@ class AlpacaVenue:
             return (self._number,)
         answer = self._asking(self.broker.account)
         self._number = str((answer.value or {}).get("account_number") or "")
+        self.currency = str((answer.value or {}).get("currency") or "")
         self._read_at = now
         return (self._number,) if self._number else ()
 
     def catalogue(self, code: str) -> Catalogue:
         return CATALOGUE
+
+    def placement_types(self, code: str) -> tuple[int, ...]:
+        """Direct to Alpaca alone: it takes no request for quote."""
+        return (ops.PLACEMENT_TYPE_DMA,)
 
     def _asking(self, work: Callable[[], Any]) -> Any:
         try:
@@ -201,12 +224,12 @@ class AlpacaVenue:
         ):
             body["stop_price"] = _text(asked.stop)
         answer = self._asking(lambda: self.broker.place(body))
-        return order_of(answer.value), answer.raw_key
+        return order_of(answer.value, self.currency), answer.raw_key
 
     def orders(self, code: str) -> tuple[list[VenueOrder], str]:
         answer = self._asking(self.broker.orders)
         listed = answer.value if isinstance(answer.value, list) else []
-        return [order_of(each) for each in listed], answer.raw_key
+        return [order_of(each, self.currency) for each in listed], answer.raw_key
 
     def cancel(self, code: str, order_id: str) -> str:
         answer = self._asking(lambda: self.broker.cancel(order_id))
@@ -237,7 +260,7 @@ class AlpacaVenue:
         ):
             body["stop_price"] = _text(change.stop)
         answer = self._asking(lambda: self.broker.replace(order_id, body))
-        return order_of(answer.value), answer.raw_key
+        return order_of(answer.value, self.currency), answer.raw_key
 
     def keep(self, name: str, record: dict[str, Any]) -> str:
         return self.broker.store.keep(

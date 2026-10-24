@@ -1,6 +1,8 @@
-"""Trading and Raw records, connectivity's pages: each the same answer as its
-tool, Enable trading for the connectivity role's admin alone, and never a
-key's value or an account's data on an admin page. SIMULATED ONLY."""
+"""Connectivity on Connection (from 0.13.0 one page for both roles, the SDK's
+`connection_pages`, 457) and Raw records (the SDK's `raw_records_page`): each
+the same answer as its tool, Enable trading for the connectivity role's
+admin alone, and never a key's value or an account's data on an admin page.
+SIMULATED ONLY."""
 
 from __future__ import annotations
 
@@ -8,16 +10,19 @@ import asyncio
 from pathlib import Path
 
 from meridian.plugin.v1 import operations_pb2 as ops
-from meridian.roles.connectivity import Sent
+from meridian.roles.connectivity import RAW, Sent
 from meridian.suites import Recorder
 from meridian.testing import PageClient
 
-from alpaca.page import State, pages, use
+from alpaca.page import CONNECTION, State, pages, use
 from alpaca.settings import LIVE, PAPER, Config, Credentials
-from alpaca.trading_page import ENABLE_TRADING, RAW, TRADING
 from trading_cases import CODE, Rig, placement, scope
 
 ROLES = ("data", "connectivity")
+#: Connection's Trading tab, and its "Enable trading".
+TRADING = CONNECTION
+TAB = {"tab": "trading"}
+ENABLE_TRADING = "/enable-trading"
 KEY = Credentials("PKTESTKEYID0000000009", "trading-page-secret-000000000000000009")
 
 
@@ -33,15 +38,16 @@ def client_for(state: State, **given: object) -> PageClient:
     return PageClient(pages, Recorder("alpaca"), roles=ROLES, **given)  # type: ignore[arg-type]
 
 
-def test_trading_serves_manage_alone_and_its_tool_reads_the_same(tmp_path: Path) -> None:
+def test_trading_is_connections_and_its_tool_reads_the_same(tmp_path: Path) -> None:
     rig = Rig(Recorder("alpaca"), enabled=False)
     client = client_for(state_with(rig, Config(sample_data=True)))
-    assert client.get(TRADING, "admin").status == 200
+    assert client.get(TRADING, "admin", **TAB).status == 200
     assert client.get(TRADING, "write").status == 403
-    page = client.get(TRADING, "admin").text
+    assert "/admin/connections" not in {page.path for page in pages.declared}
+    page = client.get(TRADING, "admin", **TAB).text
     assert CODE in page and "Read-only" in page and "Enable trading" in page
     assert "Sample data" in page
-    data = client.call_tool("read_trading").data
+    data = client.call_tool("read_connection").data["trading"]
     assert data["accounts"] == [
         {"venue_account_code": CODE, "trading": False, "order_types": [], "mapped": True}
     ]
@@ -51,10 +57,10 @@ def test_paper_is_said_plainly(tmp_path: Path) -> None:
     rig = Rig(Recorder("alpaca"))
     config = Config(credentials=KEY, key_id_set=True, secret_key_set=True, environment=PAPER)
     client = client_for(state_with(rig, config))
-    page = client.get(TRADING, "admin").text
+    page = client.get(TRADING, "admin", **TAB).text
     assert "Paper: Alpaca&#39;s paper trading API, simulated money" in page
     assert KEY.key_id not in page and KEY.secret_key not in page
-    assert KEY.key_id not in str(client.call_tool("read_trading").json)
+    assert KEY.key_id not in str(client.call_tool("read_connection").json)
 
 
 def test_enable_trading_enables_the_account_and_publishes_its_catalogue(tmp_path: Path) -> None:
@@ -71,7 +77,7 @@ def test_enable_trading_enables_the_account_and_publishes_its_catalogue(tmp_path
     assert rig.trader.trading_on(CODE)
     catalogue = recorder.on("ReportVenueCatalogue")[-1].catalogue
     assert catalogue.venue_account_code == CODE and catalogue.order_types
-    data = client.call_tool("read_trading").data
+    data = client.call_tool("read_connection").data["trading"]
     assert data["accounts"][0]["trading"] is True and "limit" in data["accounts"][0]["order_types"]
 
 
@@ -89,8 +95,12 @@ def test_only_the_connectivity_roles_admin_may_enable_trading(tmp_path: Path) ->
     answer = client.post(ENABLE_TRADING, "admin", {"venue_account_code": CODE}, roles=("data",))
     assert answer.status == 403
     assert not rig.trader.trading_on(CODE)
-    page = client.request("GET", TRADING, "admin", roles={"data": "admin", "connectivity": "admin"})
-    assert page.status == 200
+    page = client.request(
+        "GET", TRADING, "admin", roles={"data": "admin", "connectivity": "admin"}, query=TAB
+    )
+    assert page.status == 200 and "Enable trading" in page.text
+    data_only = client.request("GET", TRADING, "admin", roles={"data": "admin"}, query=TAB)
+    assert data_only.status == 200 and "Enable trading" not in data_only.text
 
 
 def test_raw_records_follows_a_facts_reference_for_a_reader_of_the_account(
@@ -120,9 +130,9 @@ def test_the_connections_badge_is_both_keys(tmp_path: Path) -> None:
     tool reads the same."""
     rig = Rig(Recorder("alpaca"))
     client = client_for(state_with(rig, Config(sample_data=True)))
-    page = client.get(TRADING, "admin").text
+    page = client.get(TRADING, "admin", **TAB).text
     assert "Demo" in page and "Alpaca's paper host" in page
-    data = client.call_tool("read_trading").data
+    data = client.call_tool("read_connection").data["trading"]
     assert data["reached_environment"] == "paper" and data["badge"] == "Demo"
     mismatch = Config(
         credentials=KEY,
@@ -132,8 +142,9 @@ def test_the_connections_badge_is_both_keys(tmp_path: Path) -> None:
         environment_setting=LIVE,
     )
     client = client_for(state_with(Rig(Recorder("alpaca")), mismatch))
-    assert client.call_tool("read_trading").data["badge"] == "Live (environment not confirmed)"
-    assert "Live (environment not confirmed)" in client.get(TRADING, "admin").text
+    trading = client.call_tool("read_connection").data["trading"]
+    assert trading["badge"] == "Live (environment not confirmed)"
+    assert "Live (environment not confirmed)" in client.get(TRADING, "admin", **TAB).text
 
 
 def test_an_environment_saved_before_0_12_0_says_save_it_again(tmp_path: Path) -> None:
@@ -141,10 +152,10 @@ def test_an_environment_saved_before_0_12_0_says_save_it_again(tmp_path: Path) -
     is not Demo, and the page and its tool say to save it again."""
     config = Config(sample_data=True, environment_setting="", environment_to_save="sandbox")
     client = client_for(state_with(Rig(Recorder("alpaca")), config))
-    page = client.get(TRADING, "admin").text
+    page = client.get(TRADING, "admin", **TAB).text
     assert 'Environment holds "sandbox", no longer offered' in page
     assert 'data-om-opens="settings"' in page
-    data = client.call_tool("read_trading").data
+    data = client.call_tool("read_connection").data["trading"]
     assert data["environment_to_save"] == "sandbox"
     assert data["badge"] == "Live (environment not confirmed)"
 
@@ -153,5 +164,5 @@ def test_no_badge_before_there_is_a_client(tmp_path: Path) -> None:
     rig = Rig(Recorder("alpaca"))
     state = state_with(rig, Config())
     state.venue = None
-    data = client_for(state).call_tool("read_trading").data
+    data = client_for(state).call_tool("read_connection").data["trading"]
     assert data["reached_environment"] == "" and data["badge"] == ""

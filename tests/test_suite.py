@@ -3,7 +3,7 @@ run unchanged against this plugin: every case mapped to the plugin's own
 conversion, from Alpaca's recorded exchange and stream, through the lake's half it runs in
 production (lake.py), against the suite's `Recorder`.
 
-Eleven cases are not presented, each with why (`NOT_PRESENTED`). Two are
+Twenty cases are not presented, each with why (`NOT_PRESENTED`). Two are
 about kinds of data Alpaca's US stock data never publishes (`about`, from
 contract v19): a currency's rate against another currency, and a crypto
 asset's price (its crypto is left to the crypto pair). Two are about a field
@@ -22,6 +22,11 @@ the venue leaves unstated. `queries-the-lake-within-bounds` is mapped as
 the SDK's data template maps it: one bounded query of a kind the role
 reads, trades, of a listing it records (`lake_query`); the plugin itself
 asks the lake nothing. The event group heard and read is the SDK's.
+
+From contract v27, the seven rates cases (`about` rates), which Alpaca's
+stock data never publishes, and the feed delay reported (`about` latency,
+until contract v28, ruling 518: recorded, never yet reported). The stream's
+liveness waits for open-meridian 0.32.3, whose listings feed records it.
 """
 
 from __future__ import annotations
@@ -35,7 +40,7 @@ from pathlib import Path
 from typing import Any
 
 from meridian.plugin.v1 import operations_pb2 as ops
-from meridian.roles.data.testing import lake_query
+from meridian.roles.data.testing import RATES_CASES, lake_query
 from meridian.suites import Recorder, run
 
 from alpaca import convert
@@ -84,6 +89,14 @@ NOT_PRESENTED = {
     "reports-an-event-group": "Alpaca's stock data lists no event contract: no event to group",
     "reports-a-flag-the-venue-does-not-state": (
         "Alpaca's stock data lists no event contract: no event whose flags go unstated"
+    ),
+    # Contract v27: the rates slice (about rates), and the feed delay reported
+    # (about latency; ruling 518).
+    **{case: "Alpaca's US stock data publishes no rates" for case in RATES_CASES},
+    "reports-its-feed-delay": "core receives ReportLatency from contract v28, ruling 515",
+    # Held for SDK 0.32.3, whose listings feed records a stream's liveness.
+    "records-a-datasets-liveness": (
+        "the SDK's listings feed records a stream's liveness from open-meridian 0.32.3"
     ),
 }
 

@@ -10,27 +10,36 @@ current. A data plugin shows no market data: prices, trades and quotes are
 the reading roles' to read, under their entitlement, and an admin page shows
 no account's data.
 
-Each page fits one screen at 1440x900 and 390x844: one-line rows, the
-details a click away, and the standing wants, which grow, drawn the latest
-few with how many there are (the tool answers every one).
+From 0.13.0 (SDK 0.32.0; rulings 202 and 457) Connection is one page for
+the data role and connectivity, the SDK's
+(`meridian.roles.connectivity.connection_pages`): connectivity's Trading is
+`read_connection`'s `trading`, drawn as Connection's further sections
+(Environment, Accounts, Placements), with "Enable trading" made on it; and
+Raw records is the SDK's (`raw_records_page`). No Trading page of its own.
+
+Each page fits one screen at 375, 582 and 1280 pixels wide: one-line rows,
+the details a click away, Connection's sections one at a time under a tab
+row, and the standing wants, which grow, drawn the latest few with how many
+there are (the tool answers every one).
 """
 
 from __future__ import annotations
 
 import datetime as dt
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 import meridian
 from meridian.plugin.v1 import operations_pb2 as ops
-from meridian.roles import data
+from meridian.roles import Latency, connectivity, data
 from meridian.roles.connectivity import Trader
 
 from .convert import NEW_YORK
 from .custody import Syncer
 from .declared import CATALOGUE
-from .kinds import Store
+from .kinds import KINDS, Store
 from .lake import DAILY, LIVE, PRICE, QUOTE, TRADES, Lake
 from .records import (
     ConnectionRead,
@@ -40,13 +49,13 @@ from .records import (
     SessionRead,
     Want,
 )
-from .settings import Config
+from .settings import SAID, Config
 from .source import AlpacaSource
 from .stream import Streamer
 from .vendor import IEX, LIMIT_PER_MINUTE, NS, SIP, Alpaca, Usage
 
 TITLE = "Alpaca"
-CONNECTION = "/"
+CONNECTION = connectivity.CONNECTION
 DATASETS = "/datasets"
 #: Alpaca's own limit on the Basic plan, of which the client spends half.
 VENDOR_LIMIT_PER_MINUTE = 200
@@ -87,6 +96,10 @@ class State:
     store: Store | None = None
     scope: meridian.AccountScope = field(default_factory=meridian.AccountScope)
     values: dict[str, object] = field(default_factory=dict)
+    #: The sessions' latency (contract v27): the Trader's calls to Alpaca's
+    #: Trading API, recorded for Connection's Sessions; not yet reported
+    #: (core receives ReportLatency from contract v28, ruling 515).
+    latency: Latency | None = None
 
 
 _state = State()
@@ -172,7 +185,6 @@ def connection_read(state: State) -> ConnectionRead:
             or (stream.last_error if stream is not None else "")
         ),
         sessions=(1 if stream is not None and stream.state == "streaming" else 0),
-        environment_to_save=config.environment_to_save,
         detail=detail,
         not_entitled=(refused[:1].upper() + refused[1:]) if asked else "",
         feeds=feeds,
@@ -369,31 +381,58 @@ def figures(state: State) -> list[meridian.Figure]:
 
 
 #: Connection's sections, one at a time under a tab row so the page fits one
-#: screen with the stream's session showing (`?tab=`); its tool answers all.
-CONNECTION_TABS = (("key", "Key"), ("limits", "Limits and use"), ("stream", "Stream"))
-
-
-@pages.page(
-    CONNECTION,
-    "Connection",
-    levels="admin",
-    roles="data",
-    answers=ConnectionRead,
-    name="read_connection",
-    description=(
-        "The plugin's connection to Alpaca, as every data plugin's Connection answers it: "
-        "the mode (Live, Sample data or No key), each credential and whether it is set "
-        "(never its value), what Alpaca serves the key, the limit and this process's "
-        "calls, the last call and error, and the streaming sessions; then Alpaca's own: "
-        "the feeds and which each dataset reads, and the stream's session (its state, "
-        "listings, reconnects and trades caught up). No market data."
-    ),
+#: screen (`?tab=`): the data role's three, then connectivity's (457); its
+#: tool answers all.
+CONNECTION_TABS = (
+    ("key", "Key"),
+    ("limits", "Limits and use"),
+    ("stream", "Stream"),
+    ("trading", "Trading"),
 )
-async def connection(request: meridian.Request) -> meridian.Response:
-    read = connection_read(_state)
+#: The tab the request being answered asked for, as connection.html reads it.
+_tab: ContextVar[str] = ContextVar("alpaca.connection_tab", default="key")
+
+
+def environment() -> str:
+    """The environment as Connection's Trading says it: Paper (simulated
+    money) or Live, or sample data."""
+    config = current().config
+    if config.sample_data:
+        return "Sample data: a simulated brokerage, nothing sent to Alpaca"
+    return SAID[config.environment]
+
+
+async def connection_record(request: meridian.Request) -> ConnectionRead:
+    """Connection's record, the data role's with Alpaca's fields; the SDK
+    adds connectivity's Trading. The tab asked for is noted for the
+    template; "Enable trading" answers on the Trading tab."""
     asked = request.query.get("tab", "")
-    tab = asked if asked in dict(CONNECTION_TABS) else CONNECTION_TABS[0][0]
-    return pages.answer("connection.html", read, head=status(read), tabs=CONNECTION_TABS, tab=tab)
+    if request.path.endswith("/enable-trading"):
+        asked = "trading"
+    _tab.set(asked if asked in dict(CONNECTION_TABS) else CONNECTION_TABS[0][0])
+    return connection_read(_state)
+
+
+pages.environment.globals["connection_tab"] = _tab.get
+pages.environment.globals["connection_status"] = lambda read: status(read)
+pages.environment.globals["connection_tabs"] = CONNECTION_TABS
+
+connectivity.connection_pages(
+    pages,
+    current,
+    connection_record,
+    venue=TITLE,
+    credentials=lambda: [
+        data.Credential("API key ID", current().config.key_id_set),
+        data.Credential("API secret key", current().config.secret_key_set),
+    ],
+    environment=environment,
+    environment_setting=lambda: current().config.environment_setting,
+    updates=lambda: str(getattr(current().updates, "state", "") or ""),
+    environment_to_save=lambda: current().config.environment_to_save,
+    latency=lambda: current().latency,
+    template="connection.html",
+)
 
 
 @pages.page(
@@ -421,9 +460,20 @@ async def datasets(request: meridian.Request) -> meridian.Response:
     return pages.answer("datasets.html", drawn, wants=len(read.wants))
 
 
-# The account side's pages, declared after the data role's: connectivity's,
-# then custody's.
-from . import custody_pages, trading_page  # noqa: E402,F401,I001
+# Custody's pages, then Raw records, for custody and connectivity (the SDK's,
+# 0.32.0).
+from . import custody_pages  # noqa: E402,F401,I001
+
+connectivity.raw_records_page(
+    pages,
+    current,
+    kinds=KINDS,
+    why=(
+        "Alpaca's answers as received, any JSON it sent, which no typed record holds; an "
+        "agent reads what they came to with read_statements and read_account_activities, "
+        "and in the book's placements and executions, each naming its raw record"
+    ),
+)
 
 
 def serve(plugin: meridian.Plugin, state: State, port: int) -> Any:

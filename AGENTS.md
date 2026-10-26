@@ -27,6 +27,9 @@ as for every plugin.
   answered or declined per subject, standing wants kept current, forming
   days restated under one row key, final closes pushed, subjects and venues
   resolved (W3.1, W3.2, W3.14, W3.15).
+- **The edge, for now** (`Lake._record`, 0.14.0): the feed delay and the
+  SDK's quality checks over live rows, temporary until the SDK's listings
+  feed takes them over (queued as SDK 0.33.2); remove it then.
 - `src/alpaca/stream.py`, `ws.py` and `conditions.py`: Alpaca's stream over
   WebSocket (the standard library's client), its reconnect and catch-up, and
   the conditions converted to the platform's trade attributes on each tape.
@@ -61,7 +64,7 @@ as for every plugin.
   (`placement_types`: DMA alone, Alpaca takes no RFQ) and reads each order in
   the account's currency, by which an order placed in Alpaca's own app is
   resolved; the Trader records the Trading API's session latency
-  (`roles.Latency`, shown on Connection, not yet reported). From 0.8.0 an order placed in Alpaca's own
+  (`roles.Latency`, shown on Connection, reported from contract v28). From 0.8.0 an order placed in Alpaca's own
   app has its fills reported on no placement (`Originated`, `Watched`:
   `trading/originated.json`), and the placement an accept creates is followed
   for its later fills.

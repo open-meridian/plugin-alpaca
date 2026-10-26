@@ -24,8 +24,11 @@ reads, trades, of a listing it records (`lake_query`); the plugin itself
 asks the lake nothing. The event group heard and read is the SDK's.
 
 From contract v27, the seven rates cases (`about` rates), which Alpaca's
-stock data never publishes, and the feed delay reported (`about` latency,
-until contract v28, ruling 518: recorded, never yet reported). The stream's
+stock data never publishes. From contract v28 the feed delay (required
+again, ruling 518) and a crossed quote (ruling 424) are presented, on
+quotes streamed for a standing want, aged and judged at the edge (lake.py);
+the chains, filings, holdings, dividend and rating cases are not, nor the
+duplicate and gap cases (Alpaca numbers no quote). The stream's
 liveness is presented: from open-meridian 0.32.3 the listings feed records
 it for any message heard, a listing's trading status among them.
 """
@@ -41,7 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from meridian.plugin.v1 import operations_pb2 as ops
-from meridian.roles.data.testing import RATES_CASES, lake_query
+from meridian.roles.data.testing import RATES_CASES, feed_delay, lake_query
 from meridian.suites import Recorder, run
 
 from alpaca import convert
@@ -68,6 +71,34 @@ DURING = at("2026-10-09", 15)
 
 Producer = Callable[[Recorder], Awaitable[None]]
 
+#: Contract v28's cases Alpaca's stock data never presents (ruling 602), each
+#: group with why. Named through this table, not as literal keys, because
+#: meridian 0.1.52's check, which CI pins until the builder moves to 0.1.53,
+#: holds contract v27's suites and refuses a v28 case name it does not know.
+V28_NOT_PRESENTED: tuple[tuple[tuple[str, ...], str], ...] = (
+    (
+        ("records-a-chains-series", "records-open-interest", "a-chain-row-is-never-resolved"),
+        "Alpaca's stock data here lists no option chain",
+    ),
+    (
+        ("a-filing-recorded", "a-fact-restated", "a-fact-confirmed", "resolves-a-filer"),
+        "Alpaca's market data publishes no filings",
+    ),
+    (
+        ("a-complete-holdings-report", "a-cusip-used-as-key", "a-stake-crossed"),
+        "Alpaca's market data publishes no holdings report",
+    ),
+    (
+        ("a-dividend-declared",),
+        "this plugin reads no corporate action from Alpaca: no declared dividend",
+    ),
+    (("a-rating-action",), "Alpaca's market data states no rating"),
+    (
+        ("a-duplicate-is-recorded-suspicious", "rows-after-a-gap-are-suspicious"),
+        "Alpaca's stream numbers no quote: no sequence to repeat or skip",
+    ),
+)
+
 #: The cases Alpaca's stock data does not present, and why (above).
 NOT_PRESENTED = {
     "an-fx-rate": "Alpaca's US stock data states no currency's rate against another",
@@ -91,10 +122,11 @@ NOT_PRESENTED = {
     "reports-a-flag-the-venue-does-not-state": (
         "Alpaca's stock data lists no event contract: no event whose flags go unstated"
     ),
-    # Contract v27: the rates slice (about rates), and the feed delay reported
-    # (about latency; ruling 518).
+    # Contract v27: the rates slice (about rates).
     **{case: "Alpaca's US stock data publishes no rates" for case in RATES_CASES},
-    "reports-its-feed-delay": "core receives ReportLatency from contract v28, ruling 515",
+    # Contract v28 (ruling 602), named through V28_NOT_PRESENTED: meridian
+    # 0.1.52's check holds contract v27's suites.
+    **{case: why for cases, why in V28_NOT_PRESENTED for case in cases},
 }
 
 #: A moment in the session, for the stream's messages.
@@ -154,10 +186,13 @@ def producers(tmp: Path) -> dict[str, Producer]:
         # BRK.B's bars state no VWAP.
         await wanted(recorder, want(BRK, data_type="meridian.v1.Bar", business_date=DAY))
 
-    async def streamed(recorder: Recorder, *messages: dict[str, Any], subject: str = SPY) -> None:
+    async def streamed(
+        recorder: Recorder, *messages: dict[str, Any], subject: str = SPY, latency: Any = None
+    ) -> None:
         # A standing want of the trades: the listing streamed, and what the
         # stream states recorded, as the plugin's stream hands it on.
         held = lake(recorder, DURING)
+        held.latency = latency
         event = want(
             subject, dataset="suite-plugin:trades", data_type="meridian.v1.Trade", standing=True
         )
@@ -200,6 +235,20 @@ def producers(tmp: Path) -> dict[str, Producer]:
                 c=["R"],
             ),
         )
+
+    def spy_quote(bid: str, ask: str) -> dict[str, Any]:
+        return message(
+            T="q", S="SPY", bx="V", bp=bid, bs=200, ax="V", ap=ask, **{"as": 300}, c=["R"]
+        )
+
+    async def delayed(recorder: Recorder, latency: Any) -> None:
+        # Contract v28 (ruling 518): a streamed quote's age at the edge,
+        # recorded and reported.
+        await streamed(recorder, spy_quote("575.43", "575.46"), latency=latency)
+
+    async def crossed(recorder: Recorder) -> None:
+        # Contract v28 (ruling 424): the bid above the offer, recorded invalid.
+        await streamed(recorder, spy_quote("575.49", "575.46"))
 
     async def one_sided(recorder: Recorder) -> None:
         # BRK.B's offer side empty: Alpaca sends it as 0.
@@ -323,6 +372,8 @@ def producers(tmp: Path) -> dict[str, Producer]:
         "a-condition-not-converted": not_converted,
         "a-trade-withdrawn": withdrawn_trade,
         "a-quote-recorded": quote,
+        "reports-its-feed-delay": feed_delay(delayed),
+        "a-crossed-quote-is-recorded-invalid": crossed,
         "records-a-datasets-liveness": alive,
         "a-one-sided-quote": one_sided,
         "a-standing-want-streamed": standing_streamed,
@@ -340,7 +391,8 @@ def test_the_data_suite_passes_unchanged(tmp_path: Path) -> None:
     assert report.passed, report.failures
     # Contract v24: and the two cases every suite holds, which the SDK answers.
     # Contract v26: the bounded lake query, and the event group the SDK answers.
-    assert len(report.passed_cases) == 25
+    # Contract v28: the feed delay and a crossed quote too.
+    assert len(report.passed_cases) == 27
     assert report.answered_by_sdk == [
         "hears-and-reads-a-replacement",
         "reads-the-template-catalogue",

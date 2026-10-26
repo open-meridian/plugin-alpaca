@@ -324,6 +324,16 @@ NOT_PRESENTED = {
         "asks the date read for each fill's settlement date (ComputeDate); it reads no "
         "calendar's days"
     ),
+    # Contract v28 (about options; ruling 602), named through a table:
+    # meridian 0.1.52's check holds contract v27's suites.
+    **{
+        case: (
+            "this version reports an option's assignment, exercise or expiry as an activity "
+            "of a kind not known, Alpaca's type beside it, never as a lifecycle event "
+            "(ruling 563): that is a later version's"
+        )
+        for case in ("reports-an-assignment",)
+    },
 }
 
 HELD = [position("AAPL", "12.5")]

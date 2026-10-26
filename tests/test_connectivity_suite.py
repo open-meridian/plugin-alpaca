@@ -8,16 +8,18 @@ quantity that works or fills), and run through the SDK's Trader
 against the runner's recorder; only the sidecar is stood in for. SIMULATED
 ONLY: nothing reaches Alpaca.
 
-Twelve cases are not presented, each with why (`NOT_PRESENTED`), as the
+Fourteen cases are not presented, each with why (`NOT_PRESENTED`), as the
 suite lets a case marked `about` or `about_field` be: calendars, locates, a
 fill's place of execution, compliance waits, and from contract v23 a charge
 with no fill (`about: charges without a fill`), a charge re-reported on an
 accepted placement (`about: venue-originated fills`; Alpaca charges no fee
 on any order) and a value-date roll; from contract v27 a dealer's quote on an RFQ
-placement (`about: rfqs`; Alpaca takes no request for quote) and the
-session's round trip reported (`about: latency`, until contract v28, ruling
-518: the Trader records it, and sends no ReportLatency yet). Every other
-case passes, among them
+placement (`about: rfqs`; Alpaca takes no request for quote); and from
+contract v28 an option's expiry (`about: options`) and a package's fill
+(`about: packages`): it places single-leg equity orders alone. The
+session's round trip is reported (required again from contract v28, ruling
+518): the Trader records each call's, and `Latency.report` sends it. Every
+other case passes, among them
 v23's fills of orders placed in Alpaca's own app, reported on no placement,
 and a later fill on the placement an accept created; and `reports-a-bust`,
 Alpaca busting a fill (its `trade_bust` event, the order's filled quantity
@@ -69,13 +71,28 @@ NOT_PRESENTED = {
     "reports-a-value-date-roll": (
         "Alpaca's trades settle on their settlement dates: it rolls no spot position at a daily cut"
     ),
-    # Contract v27: an RFQ's dealers' quotes (about rfqs), and the session's
-    # round trip reported (about latency; ruling 518).
+    # Contract v27: an RFQ's dealers' quotes (about rfqs).
     "records-a-dealers-quote-on-an-rfq-placement": (
         "Alpaca takes no request for quote: its equities trade on its order book, no dealer "
         "quoting the firm, so it takes DMA placements alone"
     ),
-    "reports-a-sessions-round-trip": "core receives ReportLatency from contract v28, ruling 515",
+    # Contract v28: an option's expiry (about options) and a package's fill
+    # (about packages; ruling 602), named through a table, not as literal
+    # keys: meridian 0.1.52's check holds contract v27's suites.
+    **{
+        case: why
+        for case, why in (
+            (
+                "reports-an-expiry",
+                "it places equity orders alone (Alpaca's `us_equity` class): it holds no option "
+                "placement to expire",
+            ),
+            (
+                "reports-a-package-fill",
+                "it places single-leg equity orders alone: Alpaca's multi-leg orders are not sent",
+            ),
+        )
+    },
 }
 
 ACCEPTED = "PLC-01JAE0000000000000000ACPT"
@@ -225,7 +242,19 @@ async def accepted_then_filled(recorder: Recorder) -> None:
     await rig.poll()
 
 
+async def round_trip(recorder: Recorder) -> None:
+    """Contract v28 (ruling 518): the trading API's session latency, each
+    call's round trip as the Trader records it, reported."""
+    rig = Rig(recorder)
+    held = placement()
+    rig.holds(held)
+    await rig.hear(held)
+    await rig.poll()
+    await rig.latency.report()
+
+
 PRODUCERS: dict[str, Producer] = {
+    "reports-a-sessions-round-trip": round_trip,
     "acknowledges-a-placement-naming-it": acknowledged,
     "hears-no-placement-of-another-instance": another_instances,
     "sends-the-venue-account-code-its-ems-set": acknowledged,

@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.14.0
+
+On open-meridian 0.33.1, contract v28 (plugin-common-v28), on core v28's
+harness.
+
+- **The edge** (contract v28, rulings 424 and 518): each live price, quote
+  and trade recorded unasked or for a standing want has its feed delay
+  recorded and is judged by the SDK's quality checks; the plugin's
+  `roles.Latency` -- the Trading API session's round trip too -- is
+  reported every 10 seconds (`ReportLatency`). **Temporary**: the SDK's
+  listings feed does neither in 0.33.1, so `Lake._record` does it with the
+  SDK's own `Latency.aged` and `quality.EdgeChecks` until the SDK's listings
+  feed takes it over (queued as SDK 0.33.2), as plugin-tradier does.
+- **The suites' v28 cases:** data -- `reports-its-feed-delay` and
+  `a-crossed-quote-is-recorded-invalid` presented; the option-chain,
+  filings, holdings, dividend and rating cases not, nor the duplicate and
+  gap cases (Alpaca's stream numbers no quote). Connectivity --
+  `reports-a-sessions-round-trip` presented; `reports-an-expiry` and
+  `reports-a-package-fill` not (single-leg equity orders). Custody --
+  `reports-an-assignment` not (an option event is reported as an activity
+  of a kind not known, never yet as a lifecycle event).
+- **`meridian plugin migrate`** (to_0_33_0, to_0_33_1): e2e/reader.py's
+  SubjectRefs are `meridian.SubjectRef` (ruling 599).
+- **The pins:** open-meridian 0.33.1 and plugin-python:0.33.1 by tag and
+  digest; core v28's runtime and harness at `8def82a` (chart 0.1.313) by
+  digest; `meridian` stays 0.1.52 in check.yaml.
+- The README's "Not released" line is gone.
+
 ## 0.13.1
 
 On open-meridian 0.32.3, contract 27.

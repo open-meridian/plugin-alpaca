@@ -194,20 +194,27 @@ def connection_read(state: State) -> ConnectionRead:
     )
 
 
+#: The supervisor's states in the page's words (SDK 0.35's
+#: `helpers.sessions.SessionState`): nothing wanted is idle, a session open
+#: is streaming; connecting, waiting, refused and no key as they are.
+SHOWN_STATES = {"off": "idle", "open": "streaming"}
+
+
 def session_read(state: State) -> SessionRead:
     assert state.streamer is not None
-    held = state.streamer.session
+    streamer = state.streamer
+    held = streamer.state
     return SessionRead(
-        state=held.state,
-        feed=held.feed,
-        subscribed=held.subscribed,
+        state=SHOWN_STATES.get(held.state, held.state),
+        feed=streamer.feed,
+        subscribed=len(held.subscribed),
         limit=state.lake.stream_limit if state.lake is not None else None,
         opened=held.opened,
         reconnects=held.reconnects,
         messages=held.messages,
-        caught_up=held.caught_up,
+        caught_up=streamer.caught,
         since=_when(held.since_ns),
-        last_message_at=_when(held.last_message_at_ns),
+        last_message_at=_when(held.last_message_ns),
         last_error=held.last_error,
     )
 
@@ -457,9 +464,3 @@ connectivity.raw_records_page(
         "and in the book's placements and executions, each naming its raw record"
     ),
 )
-
-
-def serve(plugin: meridian.Plugin, state: State, port: int) -> Any:
-    """Serve the pages on loopback beside the sidecar, reading `state`."""
-    use(state)
-    return pages.serve(plugin, port)

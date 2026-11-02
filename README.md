@@ -20,7 +20,11 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.14.0, on open-meridian 0.33.1 (contract 28): each live row's
+**Status:** 0.15.0, on open-meridian 0.35.1 (contract 29): one class for
+each role it holds -- the data role's `Market` (the SDK's listings feed),
+custody's `Custodian`, connectivity's `Trading` (the SDK's `Trader`) --
+registered with `meridian.run`, and its stream kept open by the SDK's
+supervisor (`helpers.sessions`, ruling 1027). From contract 28: each live row's
 feed delay recorded and its quality judged at the edge, the latency
 reported. From contract 27: one Connection
 for market data and orders, the SDK's (`connection_pages`, ruling 457), and
@@ -84,8 +88,8 @@ stream's liveness is recorded by the SDK's listings feed.
 - **A withdrawal** (a cancel or an error) or a **correction** is the trade's
   next version under its row key.
 - **Reconnect and catch-up.** A stream that breaks is opened again, a second
-  later and then doubling to a minute, and subscribed again from what is
-  wanted. The gap is read from Alpaca's trade history, and only the trades
+  later and then doubling to a minute, each wait jittered (the SDK's
+  supervisor, from 0.15.0), and subscribed again from what is wanted. The gap is read from Alpaca's trade history, and only the trades
   not yet recorded are sent, so the lake holds every trade and a reader
   that lost some catches up from it.
 - **A restart's gap, backfilled** (contract v20). The lake delivers each

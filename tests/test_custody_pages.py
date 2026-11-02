@@ -24,8 +24,8 @@ ROLES = ("data", "custody", "connectivity")
 
 def client(linked: bool = True, **caller: object) -> PageClient:
     recorder = Recorder("alpaca")
-    syncer = Syncer(
-        recorder, lambda: None, paper=lambda: False, stale_after=lambda: timedelta(hours=36)
+    syncer = recorder.bind(
+        Syncer(lambda: None, paper=lambda: False, stale_after=lambda: timedelta(hours=36))
     )
     syncer.status.number = NUMBER
     syncer.status.state = "Current"

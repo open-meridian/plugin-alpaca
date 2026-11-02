@@ -8,13 +8,12 @@ is read for a range and for the gap after a reconnect or a restart; a symbol
 it answers it cannot take (its 400, "invalid symbol") is declined once for
 the date and never asked again.
 
-**The edge, done here for now** (from 0.14.0; contract v28, rulings 424
-and 518): each live price, quote and trade recorded unasked or for a
-standing want has its feed delay recorded (`roles.Latency.aged`, the
-`edge` hop) and is judged by the SDK's quality checks
-(`quality.EdgeChecks`), as the SDK's `Wants.record` does for the other
-feeds. TEMPORARY: the SDK's listings feed records neither in 0.33.1; this
-glue goes when its listings feed takes them over (queued as SDK 0.33.2).
+**The edge** (from 0.14.0; contract v28, rulings 424 and 518): each live
+price, quote and trade recorded unasked or for a standing want has its
+feed delay recorded (`roles.Latency.aged`, the `edge` hop) and is judged by
+the SDK's quality checks (`quality.EdgeChecks`) -- the SDK's listings feed's
+work from open-meridian 0.35 (`listings.at_the_edge`), so the glue this
+module kept until 0.15.0 is gone.
 """
 
 from __future__ import annotations
@@ -66,24 +65,11 @@ class Lake(listings.Feed):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        #: The plugin's `roles.Latency`, where it keeps one: each live row's
-        #: age at the edge recorded (the feed delay); and the edge's checks.
-        self.latency: Any = None
+        #: The edge's checks; with the plugin's `roles.Latency` (the SDK's
+        #: `latency`), each live row recorded unasked or for a standing want
+        #: is aged and judged by the SDK's feed (open-meridian 0.35's
+        #: `listings.at_the_edge`; 0.15.0 drops the plugin's own copy).
         self.quality = EdgeChecks(clock_ns=self.clock_ns)
-
-    async def _record(self, key: str, data_type: str, rows: Any, want_id: str) -> None:
-        """Live rows recorded unasked or for a standing want, their age at
-        the edge recorded and judged by the SDK's checks first; rows pulled
-        for a read as they are. TEMPORARY until the SDK's listings feed does
-        it (SDK 0.33.2)."""
-        standing = not want_id or want_id in self.standing
-        if standing and key in (LIVE, TRADES) and data_type in (PRICE, QUOTE, TRADE):
-            rows = list(rows)
-            if self.latency is not None:
-                for row in rows:
-                    self.latency.aged(self.dataset(key), "AGE_HOP_EDGE", row)
-            rows = self.quality.judged(key, rows)
-        await super()._record(key, data_type, rows, want_id)
 
     def attributes(self, stated: Any) -> listings.Attributes:
         said = conditions.trade_attributes(stated.codes, stated.tape)

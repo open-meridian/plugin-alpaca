@@ -5,7 +5,7 @@ records as the instrument store would answer them."""
 from __future__ import annotations
 
 import datetime as dt
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -106,9 +106,10 @@ def synthetic_lake(
         import alpaca.vendor as vendor
 
         vendor.parse = parse  # type: ignore[assignment]
-    return Lake(
-        recorder, AlpacaSource(alpaca, synthetic=True), Products(tmp / "products.json"), clock
+    lake: Lake = recorder.bind(
+        Lake(AlpacaSource(alpaca, synthetic=True), Products(tmp / "products.json"), clock)
     )
+    return lake
 
 
 def want(
@@ -140,3 +141,10 @@ def restore_parse() -> Any:
     held = vendor.parse
     yield
     vendor.parse = held
+
+
+async def hear_row(recorder: Recorder, row: str, handler: Callable[[Any], Awaitable[None]]) -> None:
+    """One row the recorder answers, handed to `handler` alone -- as
+    `Recorder.receive(<row>=handler)` did before open-meridian 0.35, whose
+    `Recorder.hear(role)` hands a role class every row it hears."""
+    await recorder._hear({row: handler})

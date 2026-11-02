@@ -40,15 +40,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import signal
 import tempfile
-from collections.abc import Callable, Coroutine
+from collections.abc import Coroutine
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import meridian
 from meridian import edge
+from meridian.errors import NotRegistered
 from meridian.roles import Latency
 from meridian.roles.connectivity import Sent, Trader, Watched, trading_files
 
@@ -58,14 +58,14 @@ from .declaration import DECLARATION, PORT
 from .kinds import Store, tend, windows_from
 from .kinds import root as kinds_root
 from .lake import Lake, Products
-from .page import State, figures, serve
+from .page import State, figures, pages, use
 from .raw import RawStore, storage_root
 from .settings import Config, config_from
 from .source import AlpacaSource
 from .stream import AlpacaFeed, Feed, Streamer, symbol_limit
 from .synthetic import SyntheticFeed, SyntheticTransport, exchange
 from .synthetic_broker import SyntheticBroker
-from .updates import AlpacaUpdates, SyntheticUpdates, described
+from .updates import AlpacaUpdates, SyntheticUpdates
 from .vendor import IEX, Alpaca, NoKey, VendorError, urllib_transport
 from .venue import AlpacaVenue
 
@@ -83,6 +83,9 @@ SYNTHETIC_POLL_SECONDS = 1
 SYNTHETIC_READ_SECONDS = 5
 #: How often the kinds' windows are tended between deliveries of settings.
 TEND_SECONDS = 3600
+#: How often the source's health is said again between deliveries of
+#: settings, from what Alpaca last answered.
+HEALTH_SECONDS = 60
 
 
 class Account:
@@ -159,81 +162,162 @@ def stream_limit(state: State) -> int | None:
     return symbol_limit(known.live_feed if known is not None else IEX)
 
 
-async def health(plugin: meridian.Plugin, state: State) -> None:
-    """Say how the source is, on the heartbeat: a missing key or a refused one
-    is the plugin's health, never a ticket."""
-    config = state.config
-    if config.sample_data:
-        await say(plugin, state, True, "sample data: the built-in exchange")
-        return
-    if state.source is None:
-        await say(plugin, state, False, "no Alpaca key: enter it in Settings")
-        return
+def registered(role: Any) -> bool:
+    """Whether `meridian.run` registered `role`: the instance holds its
+    role."""
     try:
-        entitled = await asyncio.to_thread(state.source.entitlements, True)
-    except (NoKey, VendorError, OSError) as failed:
-        await say(plugin, state, False, f"Alpaca did not answer: {failed}")
-        return
-    if not entitled.answered:
-        await say(plugin, state, False, f"Alpaca refused the key: {entitled.detail}")
-        return
-    live = "SIP" if entitled.sip_live else "IEX"
-    await say(plugin, state, True, f"answering; daily from SIP, live from {live}")
+        role.plugin  # noqa: B018 - raises where it is not registered
+    except NotRegistered:
+        return False
+    return True
 
 
-async def say(plugin: meridian.Plugin, state: State, healthy: bool, detail: str) -> None:
-    """The plugin's health, with the data role's figures as they stand."""
-    await plugin.report(healthy=healthy, detail=detail[:200], figures=figures(state))
-
-
-async def read_licences(plugin: Any, state: State) -> None:
+async def read_licences(role: Any, state: State) -> None:
     """Which of its own declared datasets a deployment admin has licensed
     (contract v20, W10.9), for the Datasets page: a dataset with none is
     served by its catalogue's default terms until one is set."""
-    answered = await plugin.list_datasets()
+    answered = await role.list_datasets()
     state.licensed = frozenset(licence.dataset for licence in answered.licences)
 
 
-async def licences(plugin: meridian.Plugin, state: State) -> None:
-    """The licences, read on start and every minute."""
-    while True:
-        try:
-            await read_licences(plugin, state)
-        except meridian.MeridianError as failed:
-            log.warning("the datasets' licences were not read this time: %s", failed)
-        await asyncio.sleep(LICENCES_SECONDS)
+class Process:
+    """What the plugin's role classes share: the state the pages read, the
+    raw records, the account's client, the settings applied, and the work
+    no one role owns -- the latency reported and the health said by the
+    first class started, the account scope followed and the kinds tended by
+    the first of custody and connectivity started."""
 
+    def __init__(self) -> None:
+        self.granted = edge.storage_dir()
+        self.store = RawStore(storage_root(Path(tempfile.mkdtemp(prefix="alpaca-raw-"))))
+        self.kinds = Store(kinds_root())
+        # The sessions' latency (contract v27), shown on Connection's
+        # Sessions; and from 0.14.0 (contract v28, rulings 515 and 518) each
+        # live row's age at the edge too, all reported every 10 seconds
+        # through the first class started (SDK 0.35).
+        self.latency = Latency()
+        self.state = State(store=self.kinds, latency=self.latency)
+        self.account = Account(self.kinds, self.granted)
+        self.woken = asyncio.Event()
+        self.first: Any = None
+        self.desk: Any = None
+        self.roles: list[Any] = []
 
-async def watch_settings(
-    plugin: meridian.Plugin,
-    state: State,
-    store: RawStore,
-    configured: asyncio.Event,
-    account: Account | None = None,
-    woken: asyncio.Event | None = None,
-) -> None:
-    async for delivered in plugin.settings():
+    def connection(self) -> meridian.Plugin | None:
+        """The connection, through any class registered on it."""
+        for role in self.roles:
+            if registered(role):
+                held: meridian.Plugin = role.plugin
+                return held
+        return None
+
+    async def on_settings(self, delivered: Any) -> None:
+        """Each delivery of the settings, the first before any class starts:
+        the Alpaca client made again with the key (or, with sample data, the
+        built-in exchange), the account's client too, what is streamed
+        asked again, and the kinds tended."""
+        state, market = self.state, self.state.lake
         state.config = config_from(delivered.values, delivered.refused)
         state.values = dict(delivered.values)
-        state.alpaca, state.source = source_for(state.config, store)
-        if state.lake is not None:
-            state.lake.source = state.source
-            if state.config.sample_data:
+        state.alpaca, state.source = source_for(state.config, self.store)
+        if market is not None:
+            market.source = state.source
+            if state.config.sample_data and registered(market):
                 # The built-in exchange's listings, as a source's own list.
-                await state.lake.seed(sorted(exchange()["bars"]))
-        if account is not None and account.use(state.config):
-            state.updates, state.venue = account.updates, account.venue
-            if woken is not None:
-                woken.set()
-        configured.set()
-        await health(plugin, state)
-        if state.lake is not None:
-            state.lake.stream_limit = stream_limit(state)
-            state.lake.restream()
+                await market.seed_symbols(sorted(exchange()["bars"]))
+        if self.account.use(state.config):
+            state.updates, state.venue = self.account.updates, self.account.venue
+            self.woken.set()
+        await self.health(again=True)
+        if market is not None:
+            market.stream_limit = stream_limit(state)
+            market.restream()
         if state.streamer is not None:
             state.streamer.restart()
-        if account is not None:
-            await tend_now(plugin, account.store, delivered.values)
+        plugin = self.connection()
+        if plugin is not None:
+            await tend_now(plugin, self.kinds, delivered.values)
+
+    async def health(self, again: bool = False) -> None:
+        """Say how the source is: a missing key or a refused one is the
+        plugin's health, never a ticket. `again` asks Alpaca what the key is
+        entitled to anew; otherwise what it last answered is said."""
+        plugin = self.connection()
+        if plugin is None:
+            return
+        healthy, detail = await source_health(self.state, again)
+        try:
+            await plugin.report(healthy=healthy, detail=detail[:200])
+        except (meridian.MeridianError, ValueError) as failed:
+            log.warning("health not reported: %s", failed)
+
+    def started(self, role: Any) -> None:
+        """A class started: the first reports the latency and says the
+        health; the first of custody and connectivity follows the account
+        scope and tends the kinds."""
+        if self.latency.role is None:
+            self.latency.role = role
+        if self.first is None:
+            self.first = role
+        if self.desk is None and role.role in ("custody", "connectivity"):
+            self.desk = role
+
+    async def shared(self, role: Any) -> None:
+        """The work `role` owns of what the classes share (see `started`)."""
+        work: list[Coroutine[Any, Any, None]] = []
+        if role is self.first:
+            work += [self.latency.run(), self._health()]
+        if role is self.desk:
+            work += [self._scope(), self._tend()]
+        if work:
+            await asyncio.gather(*work)
+
+    async def _health(self) -> None:
+        while True:
+            await asyncio.sleep(HEALTH_SECONDS)
+            await self.health()
+
+    async def _scope(self) -> None:
+        """The account scope, its links (W4.11) and its ems's venue account
+        map (W11.22), on start and on every change: the account side and its
+        pages hold it from here, and custody reads again at once. A stream
+        that ends is raised, so the class's work starts again."""
+        plugin = self.connection()
+        assert plugin is not None
+        async for scope in plugin.account_scope():
+            self.state.scope = scope
+            self.woken.set()
+        raise ConnectionError("the account scope's stream ended")
+
+    async def _tend(self) -> None:
+        while True:
+            await asyncio.sleep(TEND_SECONDS)
+            plugin = self.connection()
+            if plugin is not None:
+                await tend_now(plugin, self.kinds, self.state.values)
+
+
+async def source_health(state: State, again: bool) -> tuple[bool, str]:
+    """How the source is, in a word for the plugin's health."""
+    config = state.config
+    if config.sample_data:
+        return True, "sample data: the built-in exchange"
+    if state.source is None:
+        return False, "no Alpaca key: enter it in Settings"
+    try:
+        entitled = (
+            await asyncio.to_thread(state.source.entitlements, True)
+            if again
+            else state.source.known
+        )
+    except (NoKey, VendorError, OSError) as failed:
+        return False, f"Alpaca did not answer: {failed}"
+    if entitled is None:
+        return False, "Alpaca not asked yet"
+    if not entitled.answered:
+        return False, f"Alpaca refused the key: {entitled.detail}"
+    live = "SIP" if entitled.sip_live else "IEX"
+    return True, f"answering; daily from SIP, live from {live}"
 
 
 async def tend_now(plugin: meridian.Plugin, kinds: Store, values: Any) -> None:
@@ -244,220 +328,157 @@ async def tend_now(plugin: meridian.Plugin, kinds: Store, values: Any) -> None:
         log.warning("the raw records were not tended this time: %s", failed)
 
 
-async def follow_scope(plugin: meridian.Plugin, state: State, woken: asyncio.Event) -> None:
-    """The account scope, its links (W4.11) and its ems's venue account map
-    (W11.22), on start and on every change: the account side and its pages
-    hold it from here, and custody reads again at once."""
-    async for scope in plugin.account_scope():
-        state.scope = scope
-        woken.set()
+class Market(Lake):
+    """The data role's class: Alpaca's listings in the lake (lake.py), its
+    stream kept open, its timetable kept and its licences read in `run`."""
 
+    def __init__(self, process: Process) -> None:
+        granted = process.granted
+        super().__init__(None, Products(granted / "products.json" if granted else None))
+        self.process = process
+        self.latency = process.latency
 
-async def custody_reads(state: State, syncer: Syncer, woken: asyncio.Event) -> None:
-    """Read Alpaca now, then every Read every, or sooner when the settings or
-    the links change."""
-    while True:
-        woken.clear()
-        try:
-            await syncer.run_once()
-        except meridian.MeridianError as failed:
-            log.warning("this read of the account stopped: %s", failed)
-        wait = SYNTHETIC_READ_SECONDS if state.config.sample_data else state.config.poll_seconds
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(woken.wait(), timeout=wait)
+    async def on_start(self) -> None:
+        self.process.started(self)
 
-
-async def trade(state: State, trader: Trader, hear: bool) -> None:
-    """Connectivity's work; a refusal it meets is said, and the rest goes on."""
-    await trader.run(
-        lambda: SYNTHETIC_POLL_SECONDS if state.config.sample_data else POLL_SECONDS,
-        hear=hear,
-    )
-
-
-async def hear_updates(account: Account, trader: Trader) -> None:
-    """The trade updates of the client as the settings stand, heard again
-    whenever the client is made again."""
-    while True:
-        updates = account.updates
-        if updates is None:
-            await asyncio.sleep(1)
-            continue
-        task = asyncio.create_task(updates.run(trader, account.store))
-        while account.updates is updates and not task.done():
-            await asyncio.sleep(1)
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await task
-
-
-async def tend_hourly(plugin: meridian.Plugin, state: State, kinds: Store) -> None:
-    while True:
-        await asyncio.sleep(TEND_SECONDS)
-        await tend_now(plugin, kinds, state.values)
-
-
-async def timetable(plugin: meridian.Plugin, state: State, lake: Lake) -> None:
-    while True:
-        try:
-            await lake.tick()
-        except meridian.MeridianError as failed:
-            log.warning("the timetable stopped this time: %s", failed)
-        # The figures go on the next heartbeat.
-        plugin.figures = figures(state)
-        await asyncio.sleep(TICK_SECONDS)
-
-
-async def again(work: Callable[[], Coroutine[Any, Any, None]], what: str) -> None:
-    """A stream that stops (the deployment still starting, a sidecar
-    restarted) is said and opened again, a little later each time; never
-    lost with its task."""
-    wait = 1.0
-    while True:
-        try:
-            await work()
-            return
-        except asyncio.CancelledError:
-            raise
-        except Exception as failed:  # noqa: BLE001 - said, and opened again
-            log.warning("%s stopped (%s); again in %.0fs", what, described(failed), wait)
-        await asyncio.sleep(wait)
-        wait = min(wait * 2, 30.0)
-
-
-async def run() -> None:
-    stopped = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    for stop in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(stop, stopped.set)
-
-    port = PORT
-    granted = edge.storage_dir()
-    store = RawStore(storage_root(Path(tempfile.mkdtemp(prefix="alpaca-raw-"))))
-    kinds = Store(kinds_root())
-    # The version's whole declaration (declaration.py): its settings, its
-    # pages with the levels each serves and their tools, and its documentation.
-    # A version registers exactly what it was uploaded with (contract v25).
-    async with await meridian.connect(declaration=DECLARATION) as plugin:
-        roles = set(plugin.identity.roles)
-        log.info(
-            "registered as %s, roles %s",
-            plugin.identity.instance_id,
-            ", ".join(sorted(roles)) or "none",
+    async def run(self) -> None:
+        assert self.streamer is not None
+        await asyncio.gather(
+            self.streamer.run(), self._timetable(), self._licences(), self.process.shared(self)
         )
-        lake = Lake(plugin, None, Products(granted / "products.json" if granted else None))
-        # The sessions' latency (contract v27), shown on Connection's
-        # Sessions; and from 0.14.0 (contract v28, rulings 515 and 518) each
-        # live row's age at the edge too, all reported every 10 seconds.
-        latency = Latency(plugin)
-        state = State(lake=lake, store=kinds, latency=latency)
-        lake.latency = latency
-        streamer = Streamer(
-            lambda: feed_for(state, store), lake.heard, lake.flush, caught_up=lake.caught_up
+
+    async def _timetable(self) -> None:
+        while True:
+            try:
+                await self.tick()
+            except meridian.MeridianError as failed:
+                log.warning("the timetable stopped this time: %s", failed)
+            await asyncio.sleep(TICK_SECONDS)
+
+    async def _licences(self) -> None:
+        """The licences, read on start and every minute."""
+        while True:
+            try:
+                await read_licences(self, self.process.state)
+            except meridian.MeridianError as failed:
+                log.warning("the datasets' licences were not read this time: %s", failed)
+            await asyncio.sleep(LICENCES_SECONDS)
+
+
+class Custodian(Syncer):
+    """The custody role's class: Alpaca read every Read every (custody.py),
+    or sooner when the settings or the links change."""
+
+    def __init__(self, process: Process) -> None:
+        state = process.state
+        super().__init__(
+            lambda: process.account.broker,
+            paper=lambda: state.config.paper and not state.config.sample_data,
+            stale_after=lambda: state.config.stale_after,
+            linked=lambda number: state.scope.link_of(number) is not None,
         )
-        lake.streamer = state.streamer = streamer
-        account = Account(kinds, granted)
-        woken = asyncio.Event()
-        if "custody" in roles:
-            state.syncer = Syncer(
-                plugin,
-                lambda: account.broker,
-                paper=lambda: state.config.paper and not state.config.sample_data,
-                stale_after=lambda: state.config.stale_after,
-                linked=lambda number: state.scope.link_of(number) is not None,
-            )
-        if "connectivity" in roles:
-            sent, enabled, originated = trading_files(granted)
-            state.trader = Trader(
-                plugin,
-                lambda: account.venue,
-                now=lambda: datetime.now(UTC),
-                sent=Sent(sent),
-                enabled=Sent(enabled),
-                # The venue account codes its ems mapped on it (W11.22).
-                scope=lambda: state.scope,
-                watched=Watched(originated),
-                market_zone=MARKET_ZONE,
-                # Each call to the Trading API its round trip, a placement its
-                # acknowledgement, a fill its delay (contract v27).
-                latency=state.latency,
-            )
-        configured = asyncio.Event()
-        page = serve(plugin, state, port)
-        tasks = [
-            asyncio.create_task(
-                again(
-                    lambda: watch_settings(plugin, state, store, configured, account, woken),
-                    "the settings",
-                )
-            )
-        ]
-        await configured.wait()
-        if roles & {"custody", "connectivity"}:
-            tasks.append(
-                asyncio.create_task(again(lambda: follow_scope(plugin, state, woken), "the scope"))
-            )
-            tasks.append(asyncio.create_task(tend_hourly(plugin, state, kinds)))
-        if state.syncer is not None:
-            syncer = state.syncer
-            tasks.append(
-                asyncio.create_task(
-                    again(lambda: custody_reads(state, syncer, woken), "custody's reads")
-                )
-            )
-        if state.trader is not None:
-            trader = state.trader
-            # With the data role too, its placements are heard on the one
-            # stream that hears the lake's wants (below).
-            hears = "data" not in roles
-            tasks.append(asyncio.create_task(again(lambda: trade(state, trader, hears), "trading")))
-            tasks.append(
-                asyncio.create_task(again(lambda: hear_updates(account, trader), "trade updates"))
-            )
-        if "data" in roles:
-            # With connectivity too, its placements and instructions are heard
-            # on the one stream that hears the lake's wants.
-            hearing: dict[str, Any] = {
-                "observations_wanted": lake.on_want,
-                "want_withdrawn": lake.on_withdrawn,
-            }
-            if state.trader is not None:
-                hearing["placement_updated"] = state.trader.on_placement
-                hearing["trading_instruction_changed"] = state.trader.on_instruction
-                hearing["execution_recorded"] = state.trader.on_execution
-            tasks.append(
-                asyncio.create_task(
-                    again(
-                        lambda: plugin.receive(**hearing),
-                        "hearing the lake",
-                    )
-                )
-            )
-            tasks.append(
-                asyncio.create_task(again(lambda: licences(plugin, state), "the licences"))
-            )
-            tasks.append(
-                asyncio.create_task(again(lambda: timetable(plugin, state, lake), "the timetable"))
-            )
-            tasks.append(asyncio.create_task(again(streamer.run, "the stream")))
-        # Contract v28: the latency recorded, reported (ReportLatency).
-        tasks.append(asyncio.create_task(again(latency.run, "the latency reports")))
-        log.info("serving its pages on 127.0.0.1:%d", port)
-        await stopped.wait()
-        log.info("stopping")
-        for task in tasks:
+        self.process = process
+
+    async def on_start(self) -> None:
+        self.process.state.syncer = self
+        self.process.started(self)
+
+    async def run(self) -> None:
+        await asyncio.gather(self._reads(), self.process.shared(self))
+
+    async def _reads(self) -> None:
+        state, woken = self.process.state, self.process.woken
+        while True:
+            woken.clear()
+            try:
+                await self.run_once()
+            except meridian.MeridianError as failed:
+                log.warning("this read of the account stopped: %s", failed)
+            wait = SYNTHETIC_READ_SECONDS if state.config.sample_data else state.config.poll_seconds
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(woken.wait(), timeout=wait)
+
+
+class Trading(Trader):
+    """The connectivity role's class: the SDK's `Trader` against Alpaca's
+    Trading API (or the simulated brokerage), its trade updates heard
+    beside it (updates.py)."""
+
+    def __init__(self, process: Process) -> None:
+        state, account = process.state, process.account
+        sent, enabled, originated = trading_files(process.granted)
+        super().__init__(
+            lambda: account.venue,
+            now=lambda: datetime.now(UTC),
+            sent=Sent(sent),
+            enabled=Sent(enabled),
+            # The venue account codes its ems mapped on it (W11.22).
+            scope=lambda: state.scope,
+            watched=Watched(originated),
+            market_zone=MARKET_ZONE,
+            # Each call to the Trading API its round trip, a placement its
+            # acknowledgement, a fill its delay (contract v27).
+            latency=state.latency,
+            poll_seconds=lambda: (
+                SYNTHETIC_POLL_SECONDS if state.config.sample_data else POLL_SECONDS
+            ),
+        )
+        self.process = process
+
+    async def on_start(self) -> None:
+        self.process.state.trader = self
+        self.process.started(self)
+        await super().on_start()
+
+    async def run(self) -> None:
+        await asyncio.gather(super().run(), self._updates(), self.process.shared(self))
+
+    async def _updates(self) -> None:
+        """The trade updates of the client as the settings stand, heard again
+        whenever the client is made again."""
+        account = self.process.account
+        while True:
+            updates = account.updates
+            if updates is None:
+                await asyncio.sleep(1)
+                continue
+            task = asyncio.create_task(updates.run(self, account.store))
+            while account.updates is updates and not task.done():
+                await asyncio.sleep(1)
             task.cancel()
-        for task in tasks:
-            with contextlib.suppress(asyncio.CancelledError):
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
-        page.shutdown()
 
 
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
-    asyncio.run(run())
+    process = Process()
+    state = process.state
+    market = Market(process)
+    state.lake = market
+    store = process.store
+    state.streamer = market.streamer = Streamer(
+        lambda: feed_for(state, store), market.heard, market.flush, caught_up=market.caught_up
+    )
+    # One class per role it may hold (SDK 0.35): `meridian.run` registers
+    # those the instance holds, applies the first settings, and starts each
+    # one's `run`, again after a backoff should it fail.
+    process.roles = [market, Custodian(process), Trading(process)]
+    use(state)
+    # The version's whole declaration (declaration.py): its settings, its
+    # pages with the levels each serves and their tools, and its
+    # documentation. A version registers exactly what it was uploaded with
+    # (contract v25).
+    meridian.run(
+        declaration=DECLARATION,
+        roles=process.roles,
+        pages=pages,
+        port=PORT,
+        on_settings=process.on_settings,
+        figures=lambda: figures(state),
+    )
 
 
 if __name__ == "__main__":

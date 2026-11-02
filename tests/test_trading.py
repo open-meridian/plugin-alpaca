@@ -20,6 +20,8 @@ from alpaca import synthetic_broker
 from alpaca.synthetic_broker import SyntheticBroker
 from trading_cases import CODE, Rig, asking, clock, placement
 
+from conftest import hear_row
+
 
 def run(work: object) -> None:
     asyncio.run(work)  # type: ignore[arg-type]
@@ -291,7 +293,7 @@ def test_a_dk_tells_the_venue_nothing_and_a_later_fill_is_unmatched_again() -> N
     )
     asked = len(rig.brokerage.asked)
     recorder.answer("ExecutionRecorded", lambda _: ops.ExecutionRecordedEvent(execution=answered))
-    run(recorder.receive(execution_recorded=rig.trader.on_execution))
+    run(hear_row(recorder, "ExecutionRecorded", rig.trader.on_execution_recorded))
     assert len(rig.brokerage.asked) == asked, "nothing sent to the venue on a DK"
     run(rig.poll())
     later = recorder.on("ReportExecution")[-1]

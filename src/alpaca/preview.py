@@ -55,10 +55,10 @@ def synthetic_state(root: Path) -> State:
     )
     source = AlpacaSource(alpaca, synthetic=True)
     source.entitlements()
-    lake = Lake(recorder, source, Products(root / "products.json"), lambda: NOW)
+    lake = recorder.bind(Lake(source, Products(root / "products.json"), lambda: NOW))
 
     async def fill() -> None:
-        await lake.seed(sorted(exchange()["bars"]))
+        await lake.seed_symbols(sorted(exchange()["bars"]))
         subjects = sorted(lake.products.symbols)
         await lake.daily(subjects, dt.date(2026, 10, 5), dt.date(2026, 10, 9))
         await lake.daily(
@@ -92,9 +92,10 @@ def synthetic_state(root: Path) -> State:
         pass
 
     streamer = Streamer(lambda: None, nothing, nothing)
-    held = streamer.session
-    held.state, held.feed, held.subscribed = "streaming", "iex", len(lake.streamed)
-    held.opened, held.reconnects, held.messages, held.since_ns = 2, 1, 7, NOW
+    held = streamer.state
+    streamer.feed = "iex"
+    held.state, held.subscribed = "open", tuple(lake.streamed)
+    held.opened, held.dropped, held.messages, held.since_ns = 2, 1, 7, NOW
     return State(
         config=Config(sample_data=True), lake=lake, source=source, alpaca=alpaca, streamer=streamer
     )

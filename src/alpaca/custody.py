@@ -75,6 +75,7 @@ from zoneinfo import ZoneInfo
 import meridian
 from meridian.edge import as_reported, derived, reported
 from meridian.plugin.v1 import operations_pb2 as ops
+from meridian.roles import custody as custody_role
 from meridian.roles.connectivity import moment
 
 from .broker import Broker, BrokerError, NoKey, Unanswered
@@ -399,8 +400,10 @@ class Recorded:
 class Custody:
     """Sends what a read of Alpaca says through the SDK's typed operations."""
 
-    def __init__(self, plugin: Any, paper: bool = False) -> None:
-        self._plugin = plugin
+    def __init__(self, role: Any, paper: bool = False) -> None:
+        #: The custody role object (SDK 0.35): its acts are made through it,
+        #: and the plugin-wide raw records through its connection.
+        self._role = role
         self.paper = paper
         #: The raw record of the account this read answered, which states
         #: the currency of its amounts: a resolve's currency is reported from
@@ -411,13 +414,13 @@ class Custody:
 
     async def accounts(self, done: Read) -> None:
         if done.account:
-            await self._plugin.report_external_accounts(
+            await self._role.report_external_accounts(
                 accounts=[external_account(done.account, self.paper)]
             )
 
     async def sync(self, number: str, fresh: Freshness, done: Read, history_from: str = "") -> None:
         last = _ns(done.at) if fresh.healthy else 0
-        await self._plugin.report_sync_status(
+        await self._role.report_sync_status(
             source=SOURCE,
             external_account_id=number,
             state=fresh.state,
@@ -444,13 +447,13 @@ class Custody:
             return self._resolved[symbol]
         identifiers = [meridian.Identifier(scheme="symbol", value=symbol, source=SOURCE)]
         converted = ASSET_CLASSES.get(asset_class, "")
-        found = await self._plugin.resolve_identifier(
+        found = await self._role.resolve_identifier(
             identifiers=identifiers,
             as_of_ns=as_of_ns,
             stated_asset_class=converted or None,
             stated_currency=currency,
             provenance=(
-                [reported("stated_currency", self._plugin.raw_record(self.currency_record))]
+                [reported("stated_currency", self._role.plugin.raw_record(self.currency_record))]
                 if self.currency_record
                 else []
             ),
@@ -458,7 +461,7 @@ class Custody:
         )
         instrument = str(found.instrument_id or "") if found.found else ""
         if not instrument:
-            await self._plugin.report_missing_instrument(
+            await self._role.report_missing_instrument(
                 source=SOURCE,
                 identifiers=identifiers,
                 as_of_ns=as_of_ns,
@@ -493,7 +496,7 @@ class Custody:
             instrument = await self.resolve(converted.symbol, day_ns(traded), currency)
             value_date = ""
             if instrument:
-                answer = await self._plugin.compute_date(
+                answer = await self._role.compute_date(
                     settlement=ops.SettlementDateInputs(
                         instrument_id=instrument, trade_date=converted.trade_date
                     ),
@@ -570,14 +573,14 @@ class Custody:
                     "average_cost": (
                         None if average is None else meridian.Money(average, currency)
                     ),
-                    "raw_record": self._plugin.raw_record(f"{done.positions_key}#{index}"),
+                    "raw_record": self._role.plugin.raw_record(f"{done.positions_key}#{index}"),
                     "provenance": [derived("settle_date_quantity", RULE_SETTLED)],
                 }
             )
         cash = nonzero(account.get("cash"))
         if cash is not None:
             settled_cash = cash - sum((amount for _, amount in cash_pending), Decimal(0))
-            found = await self._plugin.resolve_identifier(
+            found = await self._role.resolve_identifier(
                 identifiers=[meridian.Identifier(scheme="iso4217", value=currency)],
                 as_of_ns=as_of_ns,
             )
@@ -592,12 +595,12 @@ class Custody:
                         for day, amount in cash_pending
                     ],
                     "market_value": meridian.Money(cash, currency),
-                    "raw_record": self._plugin.raw_record(f"{done.account_key}#cash"),
+                    "raw_record": self._role.plugin.raw_record(f"{done.account_key}#cash"),
                     "provenance": [derived("settle_date_quantity", RULE_CASH_SETTLED)],
                 }
             )
         try:
-            opened = await self._plugin.record_holdings_statement(
+            opened = await self._role.record_holdings_statement(
                 source=SOURCE,
                 external_statement_id=f"{number}:{done.at.strftime('%Y%m%dT%H%M%S%fZ')}",
                 external_account_id=number,
@@ -605,14 +608,14 @@ class Custody:
                 as_of_date=as_of.isoformat(),
                 read_at_ns=_ns(done.at),
                 expected_rows=len(rows),
-                raw_record=self._plugin.raw_record(done.account_key),
+                raw_record=self._role.plugin.raw_record(done.account_key),
                 provenance=[derived("institution", RULE_INSTITUTION)],
             )
             outcome.statement, outcome.rows = opened.statement_id, len(rows)
             if opened.already_recorded:
                 return outcome
             for row in rows:
-                await self._plugin.record_holding(
+                await self._role.record_holding(
                     statement_id=opened.statement_id, external_account_id=number, **row
                 )
         except meridian.MeridianError as refused:
@@ -641,7 +644,7 @@ class Custody:
             )
             key = done.activity_keys.get(converted.external_activity_id, "")
             try:
-                await self._plugin.record_activity(
+                await self._role.record_activity(
                     external_account_id=number,
                     source=SOURCE,
                     activity=meridian.CustodialActivity(
@@ -659,7 +662,7 @@ class Custody:
                             if converted.symbol and not instrument
                             else None
                         ),
-                        raw_record=self._plugin.raw_record(
+                        raw_record=self._role.plugin.raw_record(
                             f"{key}#{converted.external_activity_id}"
                         ),
                         provenance=(
@@ -707,19 +710,18 @@ STATES = {
 }
 
 
-class Syncer:
-    """Reads Alpaca each Read every, and reports what it said."""
+class Syncer(custody_role.Role):
+    """The custody role's class (open-meridian 0.35): reads Alpaca each Read
+    every, and reports what it said through itself."""
 
     def __init__(
         self,
-        plugin: Any,
         broker: Callable[[], Broker | None],
         *,
         paper: Callable[[], bool],
         stale_after: Callable[[], timedelta],
         linked: Callable[[str], bool] = lambda _: True,
     ) -> None:
-        self._plugin = plugin
         self._broker = broker
         self._paper = paper
         self._stale_after = stale_after
@@ -739,7 +741,7 @@ class Syncer:
             else (broker.now() - timedelta(days=UNSETTLED_DAYS)).date().isoformat()
         )
         done = await asyncio.to_thread(read, broker, after)
-        custody = Custody(self._plugin, self._paper())
+        custody = Custody(self, self._paper())
         custody.currency_record = done.account_key
         if done.account:
             number = str(done.account.get("account_number") or number)

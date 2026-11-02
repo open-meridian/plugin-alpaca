@@ -28,7 +28,11 @@ from .settings import DECLARED
 PORT = 8000
 
 DECLARATION = Declaration(
-    settings=DECLARED,
+    # The settings untyped, as `Declared.declared()` names them: open-meridian
+    # 0.35.1's `meridian.run` delivers a typed class without the SDK's own
+    # settings (each kind's window), which tending reads. Drop after SDK
+    # 0.35.2, back to `settings=DECLARED`.
+    settings=DECLARED.declared(),  # type: ignore[attr-defined]
     storage=Storage(retention_days=RETENTION_DAYS, kinds=KINDS),
     catalogue=CATALOGUE,
     interface=meridian.Interface(port=PORT, title=TITLE, pages=pages),

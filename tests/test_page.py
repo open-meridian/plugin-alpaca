@@ -85,7 +85,7 @@ def test_the_connection_page_and_its_tool_read_one_source(client: PageClient) ->
     assert data["mode"] == "Sample data" and data["daily_feed"] == "sip"
     assert [c["label"] for c in data["credentials"]] == ["API key ID", "API secret key"]
     assert data["limit"].startswith("100 a minute") and data["sessions"] == 1
-    assert data["stream"]["state"] == "streaming" and data["stream"]["subscribed"] == 1
+    assert data["stream"]["state"] == "Open" and data["stream"]["subscribed"] == 1
     assert data["stream"]["reconnects"] == 2
     assert "SIP" in data["not_entitled"] and "IEX" in data["entitled_at_vendor"]
 

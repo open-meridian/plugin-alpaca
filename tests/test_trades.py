@@ -30,7 +30,6 @@ from conftest import (
     Clock,
     answer_records,
     at,
-    hear_row,
     synthetic_lake,
     want,
 )
@@ -67,7 +66,7 @@ async def stand(recorder: Recorder, lake: Lake, *subjects: str, want_id: str = "
         want_id=want_id,
     )
     recorder.answer("ObservationsWanted", lambda _: event)
-    await hear_row(recorder, "ObservationsWanted", lake.on_observations_wanted)
+    await recorder.hear(lake, "ObservationsWanted")
 
 
 async def hear(lake: Lake, *messages: dict[str, Any]) -> None:
@@ -175,7 +174,7 @@ async def test_trades_are_recorded_only_for_listings_under_a_standing_want(tmp_p
     await stand(recorder, lake, SPY)
     assert lake.streamed == ["SPY"]
     recorder.answer("WantWithdrawn", lambda _: [ops.WantWithdrawnEvent(want_id="WNT-T")])
-    await hear_row(recorder, "WantWithdrawn", lake.on_want_withdrawn)
+    await recorder.hear(lake, "WantWithdrawn")
     assert lake.streamed == []
 
 
@@ -257,7 +256,7 @@ async def test_a_range_of_trades_a_reader_wants_is_pulled_against_the_want(tmp_p
     event.valid_from_ns = at("2026-10-09", 15, 59)
     event.valid_until_ns = at("2026-10-09", 16)
     recorder.answer("ObservationsWanted", lambda _: event)
-    await hear_row(recorder, "ObservationsWanted", lake.on_observations_wanted)
+    await recorder.hear(lake, "ObservationsWanted")
     (sent,) = recorder.on("RecordTrades")
     assert sent.want_id == "WNT-1" and len(sent.trades) == 2
 

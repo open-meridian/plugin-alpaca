@@ -36,8 +36,6 @@ from meridian.suites import ANSWERED_BY_SDK, Recorder, names, run, suite
 from alpaca import synthetic_broker
 from trading_cases import Producer, Rig, placed_and_filled, placement
 
-from conftest import hear_row
-
 NOT_PRESENTED = {
     "reads-a-calendar": (
         "Alpaca's fills state no settlement date, so the plugin asks the date read for each "
@@ -240,7 +238,7 @@ async def accepted_then_filled(recorder: Recorder) -> None:
     )
     await rig.hear(created)
     recorder.answer("ExecutionRecorded", lambda _: ops.ExecutionRecordedEvent(execution=matched))
-    await hear_row(recorder, "ExecutionRecorded", rig.trader.on_execution_recorded)
+    await recorder.hear(rig.trader, "ExecutionRecorded")
     await rig.poll()
 
 

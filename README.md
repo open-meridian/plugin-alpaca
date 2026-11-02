@@ -20,7 +20,7 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.15.0, on open-meridian 0.35.2 (contract 29): one class for
+**Status:** 0.15.1, on open-meridian 0.35.3 (contract 29): one class for
 each role it holds -- the data role's `Market` (the SDK's listings feed),
 custody's `Custodian`, connectivity's `Trading` (the SDK's `Trader`) --
 registered with `meridian.run`, and its stream kept open by the SDK's

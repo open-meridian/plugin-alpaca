@@ -2,7 +2,7 @@
 
 ## 0.15.0
 
-On open-meridian 0.35.1, contract v29 (rulings 1003, 1004, 1005, 1009 to
+On open-meridian 0.35.2, contract v29 (rulings 1003, 1004, 1005, 1009 to
 1029), on core v29's harness.
 
 - **One class for each role** (open-meridian 0.35: each role is one class).
@@ -28,13 +28,14 @@ On open-meridian 0.35.1, contract v29 (rulings 1003, 1004, 1005, 1009 to
 - **The edge** (contract v28): open-meridian 0.35's listings feed ages and
   judges live rows itself (`listings.at_the_edge`), so the plugin's
   temporary `Lake._record` is gone (it would now age each row twice).
-- **The settings declared untyped for now**: open-meridian 0.35.1's
-  `meridian.run` delivers a typed settings class without the SDK's own
-  settings, each kind's window among them, which tending reads; the
-  declaration names `Declared.declared()` until 0.35.2.
+- **Its settings typed** (`@meridian.settings`, the SDK's form): open-meridian
+  0.35.2 delivers the SDK's own settings beside the class's (each kind's
+  window in `.values`), so the untyped declaration 0.35.1 needed is gone
+  (`meridian plugin migrate --to 0.35.2`: `typed-settings-declared`); the
+  settings missing are read as `.missing`.
 - **The suite's v29 cases**: `records-a-derived-series` and
   `records-a-pools-factor` not presented, with why.
-- **`meridian plugin migrate --to 0.35.1`** moved the pins and rewrote the
+- **`meridian plugin migrate --to 0.35.1`** (then `--to 0.35.2`, only the pins) moved the pins and rewrote the
   feed's and the Trader's construction (the connection no longer given) and
   their handlers' names, and `Lake.seed` as `seed_symbols` in the preview and
   some tests. By hand: the entry point, `Syncer` and the custody pages'
@@ -43,9 +44,9 @@ On open-meridian 0.35.1, contract v29 (rulings 1003, 1004, 1005, 1009 to
   the feed was reached through another name, and the e2e's reader
   (`reporting`, `signal`) and desk (`portfolio`, `oms`, `ems`, `reporting`,
   `operations`) as role classes on `meridian.run_async`.
-- **The pins:** open-meridian 0.35.1 and plugin-python:0.35.1 by tag and
-  digest (`sha256:cdc92bc9...71a9b614`); core's runtime and harness
-  `1ae36f0` (merged as 3f99222, chart 0.1.339) by digest; meridian 0.1.56
+- **The pins:** open-meridian 0.35.2 and plugin-python:0.35.2 by tag and
+  digest (`sha256:2e2dd7ad...c988bea28`); core's runtime and harness
+  `1ae36f0` (merged as 3f99222, chart 0.1.339) by digest; meridian 0.1.57
   in check.yaml.
 
 ## 0.14.1

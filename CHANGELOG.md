@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.15.0
+
+On open-meridian 0.35.2, contract v29 (rulings 1003, 1004, 1005, 1009 to
+1029), on core v29's harness.
+
+- **One class for each role** (open-meridian 0.35: each role is one class).
+  `Market` (data: the SDK's listings feed, its stream, timetable and
+  licences in `run`), `Custodian` (custody: `Syncer`, a `custody.Role`, its
+  acts made through itself; the custody pages' acts through it) and
+  `Trading` (connectivity: the SDK's `Trader`, its orders polled at its own
+  `poll_seconds`, the trade updates heard beside it), registered with
+  `meridian.run`, which registers those the instance holds, applies the
+  first settings before anything is heard, serves the pages, sets the
+  figures on each heartbeat and starts each class's `run` again after a
+  backoff should it fail. The plugin's own restart loop (`again`), its tasks
+  and its hand-wired hearing are gone. What no one role owns -- the latency
+  reported, the health said (now each minute too), the account scope
+  followed, the kinds tended -- is run by the first class started of those
+  it concerns.
+- **The stream kept open by the SDK** (ruling 1027): `Streamer` is the SDK's
+  `helpers.sessions.Supervisor` over the plugin's own Alpaca feed, its
+  reconnect loop gone: a break reopened after a wait doubling from a second
+  to a minute, jittered; a refusal waited out five minutes; the gap caught
+  up from each listing's last heard. The Connection page's Stream reads the
+  supervisor's state in its own words.
+- **The edge** (contract v28): open-meridian 0.35's listings feed ages and
+  judges live rows itself (`listings.at_the_edge`), so the plugin's
+  temporary `Lake._record` is gone (it would now age each row twice).
+- **Its settings typed** (`@meridian.settings`, the SDK's form): open-meridian
+  0.35.2 delivers the SDK's own settings beside the class's (each kind's
+  window in `.values`), so the untyped declaration 0.35.1 needed is gone
+  (`meridian plugin migrate --to 0.35.2`: `typed-settings-declared`); the
+  settings missing are read as `.missing`.
+- **The suite's v29 cases**: `records-a-derived-series` and
+  `records-a-pools-factor` not presented, with why.
+- **`meridian plugin migrate --to 0.35.1`** (then `--to 0.35.2`, only the pins) moved the pins and rewrote the
+  feed's and the Trader's construction (the connection no longer given) and
+  their handlers' names, and `Lake.seed` as `seed_symbols` in the preview and
+  some tests. By hand: the entry point, `Syncer` and the custody pages'
+  role, the stream supervisor, the tests' hearing (`hear_row`, one row as
+  `Recorder.receive` heard it) and binding, `seed` as `seed_symbols` where
+  the feed was reached through another name, and the e2e's reader
+  (`reporting`, `signal`) and desk (`portfolio`, `oms`, `ems`, `reporting`,
+  `operations`) as role classes on `meridian.run_async`.
+- **The pins:** open-meridian 0.35.2 and plugin-python:0.35.2 by tag and
+  digest (`sha256:2e2dd7ad...c988bea28`); core's runtime and harness
+  `1ae36f0` (merged as 3f99222, chart 0.1.339) by digest; meridian 0.1.57
+  in check.yaml.
+
 ## 0.14.1
 
 SDK 0.33.4: raw-record writes and enum conversion fixes (ruling 937).

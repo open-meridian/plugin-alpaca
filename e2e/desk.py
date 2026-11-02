@@ -37,6 +37,7 @@ import meridian
 from meridian import Interface, Page
 from meridian.operations import as_decimal
 from meridian.plugin.v1 import operations_pb2 as ops
+from meridian.roles import ems, oms, operations, portfolio, reporting
 
 PORT = 8000
 LOOP = asyncio.new_event_loop()
@@ -89,13 +90,55 @@ def order_json(order):
     }
 
 
+async def _nothing(_heard):
+    """An event a role's suite requires, which the desk hears and keeps
+    nothing of: it reads what it needs when the runner asks."""
+
+
+class Portfolio(portfolio.Role):
+    """`portfolio`: proposes the orders."""
+
+
+class Oms(oms.Role):
+    """`oms`: releases them; hears nothing it keeps."""
+
+    seed = False
+    on_order_updated = on_booking_updated = on_alert_changed = staticmethod(_nothing)
+
+
+class Ems(ems.Role):
+    """`ems`: claims, places, changes and accepts; hears nothing it keeps."""
+
+    seed = False
+    on_order_updated = on_placement_updated = on_execution_recorded = staticmethod(_nothing)
+
+
+class Operations(operations.Role):
+    """`operations`: the opening balance and the breaks; hears nothing it
+    keeps."""
+
+    seed = False
+    on_activity_recorded = staticmethod(_nothing)
+
+
+class Reporting(reporting.Role):
+    """`reporting`: names an instrument by its identifiers."""
+
+
 class Desk:
-    def __init__(self, plugin):
-        self.plugin = plugin
+    """Its acts made through its role classes (SDK 0.35: each role one
+    class, its acts made through it), each act through the first class
+    whose role holds it, in the order the e2e names the roles."""
+
+    def __init__(self):
+        self.roles = [Portfolio(), Oms(), Ems(), Reporting(), Operations()]
 
     async def call(self, operation, **params):
+        held = next((r for r in self.roles if operation in type(r).ACTS), None)
+        if held is None:
+            raise RuntimeError(f"no role the desk holds makes {operation}")
         try:
-            return await getattr(self.plugin, operation)(**params)
+            return await getattr(held, operation)(**params)
         except meridian.MeridianError as failed:
             said = {"words": str(failed), "type": type(failed).__name__}
             raise Refusal({"refused": said}) from None
@@ -417,18 +460,18 @@ DECLARATION = meridian.Declaration(
 )
 
 
-async def main():
-    roles = ROLES
-    plugin = await meridian.connect(
+def main():
+    desk = Desk()
+    threading.Thread(target=serve, args=(desk,), daemon=True).start()
+    # SDK 0.35: its role classes registered on one connection, until the
+    # harness stops it.
+    LOOP.run_until_complete(meridian.run_async(
         # Contract v25: what the stand-in registers is its declaration.
-        declaration=DECLARATION
-    )
-    print(f"DESK registered as {plugin.identity.instance_id}", flush=True)
-    threading.Thread(target=serve, args=(Desk(plugin),), daemon=True).start()
-    while True:
-        await asyncio.sleep(3600)
+        declaration=DECLARATION,
+        roles=desk.roles,
+    ))
 
 
 if __name__ == "__main__":
     asyncio.set_event_loop(LOOP)
-    LOOP.run_until_complete(main())
+    main()

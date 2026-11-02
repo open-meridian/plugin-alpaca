@@ -76,4 +76,6 @@ class Source:
 
 
 # Account links, Statements and History in the role's templates.
-custody.account_pages(pages, Source, what=WHAT)
+# The pages' acts are made through the custody role object (SDK 0.35,
+# ruling 1014): the plugin's `Syncer`, as the state holds it.
+custody.account_pages(pages, Source, what=WHAT, role=lambda: current().syncer)

@@ -22,7 +22,18 @@ from alpaca import conditions, convert
 from alpaca.lake import TRADES, Lake
 from alpaca.vendor import NS
 
-from conftest import BRK, RECORDS, SPY, TQQQ, Clock, answer_records, at, synthetic_lake, want
+from conftest import (
+    BRK,
+    RECORDS,
+    SPY,
+    TQQQ,
+    Clock,
+    answer_records,
+    at,
+    hear_row,
+    synthetic_lake,
+    want,
+)
 
 DURING = at("2026-10-09", 15, 30)
 NUMBERS = frozenset({"i", "p", "s", "bp", "bs", "ap", "as", "oi", "op", "os", "ci", "cp", "cs"})
@@ -56,7 +67,7 @@ async def stand(recorder: Recorder, lake: Lake, *subjects: str, want_id: str = "
         want_id=want_id,
     )
     recorder.answer("ObservationsWanted", lambda _: event)
-    await recorder.receive(observations_wanted=lake.on_want)
+    await hear_row(recorder, "ObservationsWanted", lake.on_observations_wanted)
 
 
 async def hear(lake: Lake, *messages: dict[str, Any]) -> None:
@@ -164,7 +175,7 @@ async def test_trades_are_recorded_only_for_listings_under_a_standing_want(tmp_p
     await stand(recorder, lake, SPY)
     assert lake.streamed == ["SPY"]
     recorder.answer("WantWithdrawn", lambda _: [ops.WantWithdrawnEvent(want_id="WNT-T")])
-    await recorder.receive(want_withdrawn=lake.on_withdrawn)
+    await hear_row(recorder, "WantWithdrawn", lake.on_want_withdrawn)
     assert lake.streamed == []
 
 
@@ -246,7 +257,7 @@ async def test_a_range_of_trades_a_reader_wants_is_pulled_against_the_want(tmp_p
     event.valid_from_ns = at("2026-10-09", 15, 59)
     event.valid_until_ns = at("2026-10-09", 16)
     recorder.answer("ObservationsWanted", lambda _: event)
-    await recorder.receive(observations_wanted=lake.on_want)
+    await hear_row(recorder, "ObservationsWanted", lake.on_observations_wanted)
     (sent,) = recorder.on("RecordTrades")
     assert sent.want_id == "WNT-1" and len(sent.trades) == 2
 

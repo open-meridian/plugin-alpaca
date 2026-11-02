@@ -299,14 +299,18 @@ async def test_a_broken_stream_is_opened_again_subscribed_again_and_its_gap_caug
     async def no_sleep(_: float) -> None:
         pass
 
-    streamer = Streamer(lambda: feed, on_heard, flush, caught_up, sleep=no_sleep)
+    # The SDK's supervisor (0.35): each session held once; a listing's last
+    # heard is the moment it was heard, by the supervisor's clock.
+    streamer = Streamer(lambda: feed, on_heard, flush, caught_up, sleep=no_sleep,
+                        clock_ns=lambda: 200)  # fmt: skip
     streamer.want(["SPY"])
-    await asyncio.wait_for(streamer.run(sessions=2), 5)
+    await asyncio.wait_for(streamer.run(once=True), 5)
+    await asyncio.wait_for(streamer.run(once=True), 5)
     assert feed.opened == 2 and feed.subscribed == [["SPY"], ["SPY"]]
     assert [t.trade_id for t in heard] == ["1", "2", "3"]
     assert gaps == [{"SPY": 200}]  # asked once, after the reconnect
-    session = streamer.session
-    assert session.reconnects == 2 and session.caught_up == 4 and "broke" in session.last_error
+    session = streamer.state
+    assert session.reconnects == 2 and streamer.caught == 4 and "broke" in session.last_error
 
 
 async def test_with_nothing_wanted_nothing_is_opened() -> None:
@@ -322,10 +326,10 @@ async def test_with_nothing_wanted_nothing_is_opened() -> None:
     streamer = Streamer(make, nothing, nothing)
     task = asyncio.create_task(streamer.run())
     await asyncio.sleep(0.05)
-    assert not opened and streamer.session.state == "idle"
+    assert not opened and streamer.state.state == "off"
     streamer.want(["SPY"])
     await asyncio.sleep(0.05)
-    assert opened and streamer.session.state == "no key"
+    assert opened and streamer.state.state == "no key"
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await task

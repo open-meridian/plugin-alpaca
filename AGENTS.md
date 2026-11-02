@@ -27,11 +27,22 @@ as for every plugin.
   answered or declined per subject, standing wants kept current, forming
   days restated under one row key, final closes pushed, subjects and venues
   resolved (W3.1, W3.2, W3.14, W3.15).
-- **The edge, for now** (`Lake._record`, 0.14.0): the feed delay and the
-  SDK's quality checks over live rows, temporary until the SDK's listings
-  feed takes them over (queued as SDK 0.33.2); remove it then.
+- **The edge** (0.14.0): the feed delay and the SDK's quality checks over
+  live rows, the SDK's listings feed's work from open-meridian 0.35
+  (`listings.at_the_edge`); `Lake.quality` holds the checks.
+- `src/alpaca/__main__.py`: one class per role it may hold (open-meridian
+  0.35) -- `Market` (data: the stream, the timetable, the licences),
+  `Custodian` (custody: Alpaca read every Read every) and `Trading`
+  (connectivity: the SDK's `Trader` and the trade updates) -- registered
+  with `meridian.run`, which registers those the instance holds, applies
+  the settings (`Process.on_settings`), serves the pages, sets the figures
+  and restarts a class's `run` after a backoff should it fail. What no one
+  role owns (the latency reported, the health said, the account scope
+  followed, the kinds tended) is `Process`'s, run by the first class
+  started of those it concerns.
 - `src/alpaca/stream.py`, `ws.py` and `conditions.py`: Alpaca's stream over
-  WebSocket (the standard library's client), its reconnect and catch-up, and
+  WebSocket (the standard library's client), kept open by the SDK's
+  supervisor (`Streamer`, a `helpers.sessions.Supervisor`), its catch-up, and
   the conditions converted to the platform's trade attributes on each tape.
   What is streamed is what the standing wants ask (lake.py), never kept here.
 - `src/alpaca/page.py` and `records.py`: the data role's Connection and
@@ -206,7 +217,7 @@ and subscribe to comes from the roles `pyproject.toml` declares under
   keeps every one, so operations tells "needs sign-in" apart from merely old.
   An activity recorded before its instrument resolved -- a plan's own code
   linked later, a symbol the security master completes later -- is
-  re-resolved, never sent again: `plugin.re_resolve_activity(
+  re-resolved, never sent again: `self.re_resolve_activity(
   external_account_id=..., source=..., external_activity_id=...,
   instrument_id=..., provenance=meridian.Provenance(...),
   resolved_at_ns=...)`, the provenance saying what resolved it (the link and

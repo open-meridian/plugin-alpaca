@@ -5,12 +5,14 @@ the SDK's PageClient as the sidecar would ask them."""
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 from meridian.suites import Recorder
 from meridian.testing import PageClient
 
+from alpaca.custody import Syncer
 from alpaca.lake import LIVE_KINDS, TRADES, Standing
 from alpaca.page import CONNECTION, DATASETS, State, pages, use
 from alpaca.settings import Config, Credentials
@@ -38,8 +40,8 @@ def synthetic_state(tmp: Path) -> State:
         pass
 
     streamer = Streamer(lambda: None, nothing, nothing)
-    streamer.session.state, streamer.session.feed = "streaming", "iex"
-    streamer.session.subscribed, streamer.session.reconnects = 1, 2
+    streamer.state.state, streamer.feed = "open", "iex"
+    streamer.state.subscribed, streamer.state.dropped = ("SPY",), 2
     return State(
         config=Config(sample_data=True),
         lake=lake,
@@ -149,9 +151,14 @@ def test_no_key_value_and_no_price_is_ever_shown(tmp_path: Path) -> None:
     state = synthetic_state(tmp_path)
     state.config = Config(credentials=KEY, key_id_set=True, secret_key_set=True)
     state.source._entitled = Entitlements(answered=True, iex=True, sip_history=True)  # type: ignore[union-attr]
+    # The sidecar's stand-in, for the custody pages' reads (from 0.8.0),
+    # made through the custody role's class bound to it (SDK 0.35).
+    recorder = Recorder("alpaca")
+    state.syncer = recorder.bind(
+        Syncer(lambda: None, paper=lambda: False, stale_after=lambda: timedelta(hours=36))
+    )
     use(state)
-    # The sidecar's stand-in, for the custody pages' reads (from 0.8.0).
-    client = PageClient(pages, Recorder("alpaca"))
+    client = PageClient(pages, recorder)
     for path in (CONNECTION, DATASETS):
         text = client.get(path, "admin").text
         assert KEY.key_id not in text and KEY.secret_key not in text

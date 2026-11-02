@@ -184,11 +184,12 @@ class Read:
             keyless=True,
             synthetic=True,
         )
-        self.syncer = Syncer(
-            recorder,
-            lambda: self.broker,
-            paper=lambda: False,
-            stale_after=lambda: timedelta(hours=36),
+        self.syncer = recorder.bind(
+            Syncer(
+                lambda: self.broker,
+                paper=lambda: False,
+                stale_after=lambda: timedelta(hours=36),
+            )
         )
 
     async def once(self) -> None:
@@ -261,8 +262,8 @@ def thin(recorder: Recorder) -> Awaitable[None]:
 
 def paged(**caller: Any) -> Callable[[Recorder], PageClient]:
     def client(recorder: Recorder) -> PageClient:
-        syncer = Syncer(
-            recorder, lambda: None, paper=lambda: False, stale_after=lambda: timedelta(hours=36)
+        syncer = recorder.bind(
+            Syncer(lambda: None, paper=lambda: False, stale_after=lambda: timedelta(hours=36))
         )
         syncer.status.number = NUMBER
         page.use(State(config=Config(sample_data=True), syncer=syncer))

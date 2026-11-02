@@ -183,7 +183,7 @@ def connection_read(state: State) -> ConnectionRead:
             or (state.lake.last_error if state.lake else "")
             or (stream.last_error if stream is not None else "")
         ),
-        sessions=(1 if stream is not None and stream.state == "streaming" else 0),
+        sessions=(1 if stream is not None and stream.state == "Open" else 0),
         detail=detail,
         not_entitled=(refused[:1].upper() + refused[1:]) if asked else "",
         feeds=feeds,
@@ -194,18 +194,14 @@ def connection_read(state: State) -> ConnectionRead:
     )
 
 
-#: The supervisor's states in the page's words (SDK 0.35's
-#: `helpers.sessions.SessionState`): nothing wanted is idle, a session open
-#: is streaming; connecting, waiting, refused and no key as they are.
-SHOWN_STATES = {"off": "idle", "open": "streaming"}
-
-
 def session_read(state: State) -> SessionRead:
     assert state.streamer is not None
     streamer = state.streamer
     held = streamer.state
     return SessionRead(
-        state=SHOWN_STATES.get(held.state, held.state),
+        # The SDK's words for a supervised session (0.35.3, ruling 1044):
+        # Off, No key, Connecting, Open, Waiting or Refused.
+        state=held.label,
         feed=streamer.feed,
         subscribed=len(held.subscribed),
         limit=state.lake.stream_limit if state.lake is not None else None,
@@ -359,15 +355,13 @@ def figures(state: State) -> list[meridian.Figure]:
             why=("Not served: " + ", ".join(missing)) if missing else "",
         )
     stream = read.stream
-    if stream is None or stream.state in ("idle", ""):
+    if stream is None or stream.state in ("Off", ""):
         streaming: Any = "Off"
-    elif stream.state == "streaming":
+    elif stream.state == "Open":
         limit = f" of {stream.limit}" if stream.limit is not None else ""
         streaming = f"{stream.subscribed}{limit} listings"
     else:
-        streaming = meridian.Figure(
-            "", stream.state.capitalize(), state="warn", why=stream.last_error[:200]
-        )
+        streaming = meridian.Figure("", stream.state, state="warn", why=stream.last_error[:200])
     last = max((s.last_recorded for s in served), default="")
     used = state.alpaca.usage if state.alpaca is not None else Usage()
     now = state.alpaca.clock_ns() if state.alpaca is not None else 0

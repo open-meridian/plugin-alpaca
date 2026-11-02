@@ -24,11 +24,11 @@ class FeedRead:
 
 @dataclass(frozen=True)
 class SessionRead:
-    """The stream: its state (idle, connecting, streaming, waiting, refused,
-    no key), the feed, how many listings it streams of how many it may,
-    the sessions opened and reopened, the messages heard, the trades caught
-    up after a reconnect or a restart, and the last message and error.
-    Never a key."""
+    """The stream: its state in the SDK's words (`SessionState.label`: Off, No
+    key, Connecting, Open, Waiting or Refused), the feed, how many listings
+    it streams of how many it may, the sessions opened and reopened, the
+    messages heard, the trades caught up after a reconnect or a restart,
+    and the last message and error. Never a key."""
 
     state: str
     feed: str = ""

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.15.1
+
+On open-meridian 0.35.3 (a fix), contract v29.
+
+- **A message stating nothing is the stream's sign of life again** (ruling
+  418): 0.35.3's supervisor hands each heartbeat or status to the feed as
+  [], so the live dataset's liveness is recorded between Alpaca's prints and
+  quotes, as before 0.35; nothing of the plugin's own was needed, and a test
+  holds it.
+- **The stream's state in the SDK's words** (ruling 1044): the Connection
+  page and its tool show `SessionState.label` -- Off, No key, Connecting,
+  Open, Waiting, Refused -- in place of the plugin's own idle and streaming.
+- **The tests hear one row through the SDK** (`Recorder.hear(role, row)`,
+  0.35.3), the plugin's own helper over its private hearing gone.
+- **`meridian plugin migrate --to 0.35.3`** moved the pins. Its
+  `unregistered-role-object` findings on page.py name the role's page
+  records (`ConnectionRead`, `DatasetsRead`, `Served`, `Want`), no role
+  class: nothing to do.
+- **The pins:** open-meridian 0.35.3 and plugin-python:0.35.3 by tag and
+  digest (`sha256:90571a36...b173a43463`); meridian 0.1.58 in check.yaml.
+
 ## 0.15.0
 
 On open-meridian 0.35.2, contract v29 (rulings 1003, 1004, 1005, 1009 to

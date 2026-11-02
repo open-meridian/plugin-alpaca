@@ -354,3 +354,32 @@ async def test_the_synthetic_stream_states_new_trades_each_cycle(tmp_path: Path)
     assert all(s.symbol in ("SPY", "BRK.B") for s in first)
     assert any(isinstance(s, SourceTrade) and s.cancelled for s in first)
     assert any(isinstance(s, SourceQuote) and s.ask is None for s in first)
+
+
+async def test_a_message_stating_nothing_is_the_lakes_sign_of_life(tmp_path: Path) -> None:
+    """A heartbeat or a status converts to no row, and still reaches the lake
+    as its stream's sign of life (open-meridian 0.35.3, ruling 418): the
+    supervisor hands it on as [], and the liveness counts it."""
+    from meridian.suites import Recorder
+
+    from conftest import Clock, synthetic_lake
+
+    clock = Clock(1_791_559_800 * 10**9)
+    lake = synthetic_lake(Recorder("suite-plugin"), clock, tmp_path)
+    feed = Scripted([[[]]])
+    heard: list[list[Any]] = []
+
+    async def on_heard(stated: list[Any]) -> None:
+        heard.append(list(stated))
+        await lake.heard(stated)
+
+    async def flush() -> None:
+        pass
+
+    async def no_sleep(_: float) -> None:
+        pass
+
+    streamer = Streamer(lambda: feed, on_heard, flush, sleep=no_sleep, clock_ns=clock)
+    streamer.want(["SPY"])
+    await asyncio.wait_for(streamer.run(once=True), 5)
+    assert heard == [[]] and lake.alive_ns == clock.now

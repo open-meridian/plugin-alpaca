@@ -34,7 +34,7 @@ env:
   # (custody.account_pages) in role-pages; 0.1.46 was the first
   # to check docs/ (documentation-sections, documentation-safe). Locally `make check
   # MERIDIAN_BIN=...` tries a build of another.
-  MERIDIAN_VERSION: 0.1.58
+  MERIDIAN_VERSION: 0.1.60
 
 jobs:
   check:

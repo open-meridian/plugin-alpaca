@@ -28,8 +28,8 @@ Settings.
 ## 3. License and entitle its datasets
 
 A deployment admin, on the deployment's **Data sources** page, licenses
-`daily`, `live` and `trades`, each starting from Alpaca's terms, one person's
-use, and entitles the plugins that read prices, trades and quotes. Nothing
+`daily`, `live` and `trades` -- each describing Alpaca's terms in words, for
+one person's use -- and entitles the plugins that read prices, trades and quotes. Nothing
 is read from Alpaca until a plugin entitled to a dataset asks for a price.
 
 ## 4. Link the account

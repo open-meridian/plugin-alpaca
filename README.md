@@ -20,7 +20,7 @@ It is the first half of the retail pair, beside
 [meridian-tradier](https://github.com/open-meridian/plugin-tradier): both
 pass the same suites of the SDK, unchanged.
 
-**Status:** 0.15.1, on open-meridian 0.35.3 (contract 29): one class for
+**Status:** 0.16.0, on open-meridian 0.36.0 (contract 30): each dataset's terms in words and how a gap in it is recovered. From contract 29: one class for
 each role it holds -- the data role's `Market` (the SDK's listings feed),
 custody's `Custodian`, connectivity's `Trading` (the SDK's `Trader`) --
 registered with `meridian.run`, and its stream kept open by the SDK's
@@ -44,11 +44,11 @@ stream's liveness is recorded by the SDK's listings feed.
 
 ## What it serves
 
-| Dataset | What | From | Arrives | Default terms |
+| Dataset | What | From | Arrives | A gap in it |
 |---|---|---|---|---|
-| `daily` | each listing's close and daily bar (open, high, low, close, volume, VWAP, trade count) for a business date, New York's day ending at the 16:00 close | Alpaca's consolidated history (SIP), past the free plan's restricted latest 15 minutes: a declared delay of 16 minutes | pulled when a reader's read is wanted; pushed once a session's close is final, for the listings it has served | kept; personal use |
-| `live` | the latest trade's price (`last`), the best bid and ask; the best bid and offer as a quote, with its sizes | SIP where the key has it in real time (Algo Trader Plus), else IEX, the one exchange a free account sees | pulled for a read; while a standing want stands, prices kept current once a minute and quotes streamed, at most one a second per listing | served, not kept; personal use |
-| `trades` | each trade with the platform's trade attributes, converted from its conditions | the same feed as `live` | streamed for the listings under a standing want; pulled for a range a reader wants | kept two days; personal use |
+| `daily` | each listing's close and daily bar (open, high, low, close, volume, VWAP, trade count) for a business date, New York's day ending at the 16:00 close | Alpaca's consolidated history (SIP), past the free plan's restricted latest 15 minutes: a declared delay of 16 minutes | pulled when a reader's read is wanted; pushed once a session's close is final, for the listings it has served | asked again of the history (`backfill`) |
+| `live` | the latest trade's price (`last`), the best bid and ask; the best bid and offer as a quote, with its sizes | SIP where the key has it in real time (Algo Trader Plus), else IEX, the one exchange a free account sees | pulled for a read; while a standing want stands, prices kept current once a minute and quotes streamed, at most one a second per listing | not fetched again (`stream_only`) |
+| `trades` | each trade with the platform's trade attributes, converted from its conditions | the same feed as `live` | streamed for the listings under a standing want; pulled for a range a reader wants | asked again of the trade history (`backfill`) |
 
 - A daily price is keyed by a plain date. A day still forming is recorded
   and restated under the same row as it fills, until its close is final.
@@ -140,10 +140,12 @@ Not legal advice: read Alpaca's own terms before relying on this.
   restricted; Algo Trader Plus ($99 a month when read) gives every US exchange
   in real time.
 
-So each dataset's default licence is one person's (`personal_use`), shown and
-used by its holder. The deployment admin confirms or changes it on the Data
-sources page, which warns when more than one person can read a plugin
-entitled to a one-person dataset. Neither this plugin nor its documentation
+Each dataset says so in words (contract 30, ruling 1032: `declared.TERMS`),
+shown on Data sources, and declares no licence. The deployment admin sets
+it there -- one person's terms suit it (`personal_use`, `live` served and
+not kept, `trades` kept two days), and the page warns when more than one
+person can read a plugin entitled to a one-person dataset; until one is
+set, the lake keeps the rows and reads every use right restrictively. Neither this plugin nor its documentation
 says a deployment meets Alpaca's terms: the licence records what the admin
 entered.
 

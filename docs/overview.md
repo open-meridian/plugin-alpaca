@@ -24,8 +24,8 @@ It serves three datasets:
 - **Trades** (`alpaca:trades`): each trade, streamed from the same feed
   while something is reading the listing, with what it may count for in a
   day's high, low, open, close and volume, converted from Alpaca's
-  condition codes. Kept two days by default, so a plugin that missed some
-  catches up. If the stream drops, the plugin reconnects and fills the gap
+  condition codes. Kept two days where your licence says so, so a plugin
+  that missed some catches up. If the stream drops, the plugin reconnects and fills the gap
   from Alpaca's trade history.
 
 ## How it records

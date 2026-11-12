@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.16.0
+
+On open-meridian 0.36.0, contract 30, on core aae501d's harness (contract v30,
+chart 0.1.538).
+
+- **Alpaca's terms in words** (ruling 1032): `licence_default` is gone from
+  the contract. `meridian plugin migrate --to 0.36.0` wrote two licences as
+  words ("Kept by the lake; ... one person's terms.") and left the third
+  (`trades`, a non-literal retention) by hand; each dataset now describes
+  Alpaca's plans and terms (`declared.TERMS`): the Free plan (IEX real
+  time, other data 15 minutes delayed, 200 calls a minute) and Algo Trader
+  Plus ($99 a month, every US exchange in real time); personal, non-business
+  use for a non-professional subscriber; no redistribution without Alpaca's
+  written consent. The Datasets page draws the words in place of the terms
+  it worked out from the licence; the e2e reads them, and each gap
+  recovery, from core's listing. The plugin declares no licence: until a
+  deployment admin sets one on Data sources, the lake keeps the rows and
+  reads every use right restrictively.
+- **How a gap is recovered** (W10.14): `daily` and `trades` `backfill`
+  (Alpaca serves bars and trades back in time), `live` `stream_only`. No
+  sessions calendar (the platform holds no US equity trading-sessions
+  calendar yet), no `most_shards`.
+- **Pins**: open-meridian 0.36.0 and its base by digest; meridian 0.1.60 in
+  the check workflow; core's runtime and harness at `aae501d`, by digest.
+
 ## 0.15.1
 
 On open-meridian 0.35.3 (a fix), contract v29.

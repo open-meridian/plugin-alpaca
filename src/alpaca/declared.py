@@ -29,15 +29,21 @@ plan's Q21 and Q40 have a source's daily and live data and its trades:
   range; apart from the live prices (the plan's Q40), so an admin licenses
   and keeps them apart.
 
-**The terms Alpaca's standard terms impose** (`licence_default`), which the
-deployment's admin confirms or replaces on the Data sources page: a
-non-professional subscriber receives market data "solely for their personal,
-non-business use", nothing redistributed without Alpaca's written consent.
-So each dataset's terms are one person's (`personal_use`), shown and used
-by its holder (`display`, `derived_use`); the daily one kept, the live one
-served and not kept, the trades kept two days (the plan's Q40: a reader that
-lost some catches up from the lake). A summary, not legal advice; the README
-says the same.
+**Its terms and pricing** (contract 30, ruling 1032): no dataset declares a
+licence. Each describes Alpaca's market data plans and terms in plain words
+(`TERMS`): a non-professional subscriber receives market data "solely for
+their personal, non-business use", nothing redistributed without Alpaca's
+written consent. The deployment's admin sets the deployment's licence on
+the Data sources page, which is the one enforced (one person's terms suit
+it; the live dataset served and not kept, the trades kept two days, the
+plan's Q40). A summary, not legal advice; the README says the same.
+
+**How a gap is recovered** (W10.14): `daily` and `trades` are `backfill` --
+Alpaca serves bars and trades back in time, and a want of a range is
+answered from them; `live` is `stream_only` -- a quote or a latest price as
+it stood is not served again. No sessions calendar: the platform holds no
+US equity trading-sessions calendar yet (the daily dataset's `calendar_id`
+is the trading calendar's). No `most_shards`.
 
 **The storage**, at the edge (decisions/028): Alpaca's raw responses, every
 row's raw record, and the product map. The account side keeps three kinds
@@ -51,7 +57,7 @@ longest window, the data role's raw responses kept within it.
 
 from __future__ import annotations
 
-from meridian import DatasetDeclaration, DatasetLicence
+from meridian import DatasetDeclaration
 
 from .convert import DAY_END_MINUTE
 from .kinds import KINDS
@@ -63,8 +69,15 @@ VENDOR = "Alpaca"
 RETENTION_DAYS = max(kind.window_days for kind in KINDS)
 #: Alpaca's consolidated history reaches back to 2016.
 HISTORY_DAYS = 3650
-#: How long the lake keeps a trade by default: two days (the plan's Q40).
-TRADES_KEPT_DAYS = 2
+#: Alpaca's market data plans and terms, in plain words (ruling 1032).
+TERMS = (
+    "Alpaca's Market Data API, read with the account's API key. Its Free plan ($0) serves IEX "
+    "in real time and other data 15 minutes delayed, 200 calls a minute; Algo Trader Plus "
+    "($99 a month) serves all US exchanges in real time, calls unlimited; both reach back "
+    "seven years and more. A non-professional subscriber receives the data solely for "
+    "personal, non-business use, and nothing is redistributed without Alpaca's written "
+    "consent."
+)
 
 #: The platform's US equity venues (NYSE markets) calendar, read from the
 #: platform on 2026-10-14 (the v24 plan's O10): the daily dataset's business
@@ -86,9 +99,8 @@ CATALOGUE = (
         modes=["pull", "push"],
         cadence=86_400,
         history=HISTORY_DAYS,
-        licence_default=DatasetLicence(
-            kept=True, derived_use=True, display=True, personal_use=True
-        ),
+        terms_and_pricing=TERMS,
+        gap_recovery="backfill",
         day_time_zone="America/New_York",
         day_end_minute=DAY_END_MINUTE,
         calendar_id=US_EQUITY_CALENDAR,
@@ -100,9 +112,8 @@ CATALOGUE = (
         data_types=["meridian.v1.Price", "meridian.v1.Quote"],
         modes=["pull", "stream"],
         cadence=LIVE_CADENCE_SECONDS,
-        licence_default=DatasetLicence(
-            kept=False, derived_use=True, display=True, personal_use=True
-        ),
+        terms_and_pricing=TERMS,
+        gap_recovery="stream_only",
         day_time_zone="America/New_York",
         day_end_minute=DAY_END_MINUTE,
     ),
@@ -111,13 +122,8 @@ CATALOGUE = (
         vendor=VENDOR,
         data_types=["meridian.v1.Trade"],
         modes=["pull", "stream"],
-        licence_default=DatasetLicence(
-            kept=True,
-            retention_days=TRADES_KEPT_DAYS,
-            derived_use=True,
-            display=True,
-            personal_use=True,
-        ),
+        terms_and_pricing=TERMS,
+        gap_recovery="backfill",
         day_time_zone="America/New_York",
         day_end_minute=DAY_END_MINUTE,
     ),

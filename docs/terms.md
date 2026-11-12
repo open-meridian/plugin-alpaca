@@ -10,8 +10,9 @@ A summary, not legal advice. Read Alpaca's own terms before relying on it.
 - **What a personal deployment may keep:** its own copy, for the account
   holder's use.
 
-So the plugin declares each dataset's terms as one person's. Your
-deployment's Data sources page records the licence you enter, and warns
+Each dataset describes these terms in words on Data sources, and declares
+no licence: license each with one person's terms. Your deployment's Data
+sources page records the licence you enter, and warns
 when more than one person can read a plugin entitled to a one-person
 dataset. Open Meridian does not decide whether your use meets Alpaca's
 terms; the licence records what you entered.

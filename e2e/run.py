@@ -12,9 +12,9 @@ from the same image.
 
 1. The catalogue: the three datasets listed by `dashboard__list_datasets`,
    as the plugin declared them -- daily pulled and pushed, its day New
-   York's to 16:00; live pulled and streamed; trades pulled and streamed,
-   kept two days -- each with Alpaca's terms, one person's, as its default
-   licence.
+   York's to 16:00; live pulled and streamed; trades pulled and streamed --
+   each with Alpaca's terms in words and no licence declared (contract 30,
+   ruling 1032), daily and trades asked again on a gap, live not.
 2. Licensed and entitled: the deployment admin licenses the three, and
    entitles the reader to them, the broker reloaded with each.
 3. A close wanted: the reader reads SPY's close for 2026-10-08, which the lake
@@ -190,14 +190,14 @@ def run():
     must(daily["modes"] == ["pull", "push"] and live["modes"] == ["pull", "stream"]
          and trades_entry["modes"] == ["pull", "stream"],
          f"step 1, the modes: {daily['modes']}, {live['modes']}, {trades_entry['modes']}")
-    must(trades_entry["licence_default"]["kept"] is True
-         and trades_entry["licence_default"]["retention_days"] == 2,
-         f"step 1, trades kept two days by default: {trades_entry['licence_default']}")
+    must([e.get("gap_recovery") for e in (daily, live, trades_entry)]
+         == ["backfill", "stream_only", "backfill"],
+         f"step 1, how a gap is recovered: {daily}, {live}, {trades_entry}")
     must(daily["day_time_zone"] == "America/New_York" and daily["day_end_minute"] == 960,
          f"step 1, the declared day: {daily}")
-    must(daily["licence_default"]["personal_use"] is True and daily["licence_default"]["kept"] is True
-         and live["licence_default"]["kept"] is False,
-         f"step 1, Alpaca's terms as the default licence: {daily['licence_default']}, {live['licence_default']}")
+    must(all("non-business use" in e.get("terms_and_pricing", "") and "licence_default" not in e
+             for e in (daily, live, trades_entry)),
+         f"step 1, Alpaca's terms in words, no licence declared: {daily}, {live}")
 
     # 2. Licensed and entitled.
     runner("licence", DAILY, "kept=true", "retention_days=0", "derived_use=true", "display=true",

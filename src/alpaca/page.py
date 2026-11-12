@@ -222,15 +222,6 @@ SERVES = {
 }
 
 
-def _terms(declared: Any) -> str:
-    licence = declared.licence_default
-    if licence is None or not licence.kept:
-        kept = "served, not kept"
-    else:
-        kept = f"kept {licence.retention_days} days" if licence.retention_days else "kept"
-    return kept + ("; personal use" if licence is not None and licence.personal_use else "")
-
-
 def datasets_read(state: State) -> DatasetsRead:
     lake = state.lake
     connection = connection_read(state)
@@ -256,7 +247,7 @@ def datasets_read(state: State) -> DatasetsRead:
                 data=SERVES.get(declared.key, declared.key),
                 arrives=", ".join(_mode(m) for m in declared.modes),
                 day="New York's, to 16:00",
-                default_terms=_terms(declared),
+                default_terms=declared.terms_and_pricing,
                 entitled_at_vendor=at_vendor,
                 recorded=counts.recorded if counts else 0,
                 declined=counts.declined if counts else 0,

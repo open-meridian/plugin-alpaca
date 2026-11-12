@@ -13,6 +13,7 @@ from meridian.suites import Recorder
 from meridian.testing import PageClient
 
 from alpaca.custody import Syncer
+from alpaca.declared import TERMS
 from alpaca.lake import LIVE_KINDS, TRADES, Standing
 from alpaca.page import CONNECTION, DATASETS, State, pages, use
 from alpaca.settings import Config, Credentials
@@ -99,12 +100,13 @@ def test_the_datasets_page_and_its_tool_read_one_source(client: PageClient) -> N
     data = client.call_tool("read_datasets").data
     daily = next(d for d in data["served"] if d["key"] == "daily")
     assert daily["recorded"] == 1 and daily["arrives"] == "pull, push"
-    assert daily["default_terms"] == "kept; personal use" and daily["feed"] == "SIP"
+    # Each dataset's terms are Alpaca's, in words (contract 30, ruling 1032).
+    assert daily["default_terms"] == TERMS and daily["feed"] == "SIP"
     assert daily["licensed"] is False and "Not licensed yet" in page
     live = next(d for d in data["served"] if d["key"] == "live")
-    assert live["default_terms"] == "served, not kept; personal use"
+    assert live["default_terms"] == TERMS
     trades = next(d for d in data["served"] if d["key"] == "trades")
-    assert trades["arrives"] == "pull, stream" and trades["default_terms"].startswith("kept 2")
+    assert trades["arrives"] == "pull, stream" and "non-business use" in trades["default_terms"]
     # The latest want first, each with what it asks and its listings.
     assert [w["asked"] for w in data["wants"]] == ["trades", "last, bid, ask"]
     assert data["wants"][0]["listings"] == ["SPY"] and data["wants"][0]["streamed"]

@@ -25,15 +25,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-import meridian.edge
-
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
-
-
-def storage_root(fallback: Path) -> Path:
-    """Where raw records go: the instance's granted storage, else `fallback`."""
-    granted = meridian.edge.storage_dir()
-    return (granted / "raw") if granted is not None else fallback
 
 
 class RawStore:

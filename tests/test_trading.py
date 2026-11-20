@@ -97,9 +97,7 @@ def test_a_restart_never_sends_a_placement_twice(tmp_path: Path) -> None:
     brokerage = SyntheticBroker(clock, tmp_path / "synthetic-venue" / "orders.json")
     recorder = Recorder("alpaca")
     rig = placed(recorder, quantity="200", sent=sent, broker=brokerage)
-    assert json.loads((tmp_path / "trading" / "sent.json").read_text()) == [
-        "PLC-01JAE00000000000000000001"
-    ]
+    assert list(Sent(tmp_path / "trading" / "sent.json")) == ["PLC-01JAE00000000000000000001"]
     # Started again, the book still holding the placement queued.
     again = Recorder("alpaca")
     restarted = Rig(
@@ -227,7 +225,7 @@ def test_enabling_trading_publishes_the_catalogue(tmp_path: Path) -> None:
         tif for tifs in offered.values() for tif in tifs
     ]
     assert second.catalogue.execution_acknowledgement == ops.EXECUTION_ACKNOWLEDGEMENT_NONE
-    assert json.loads((tmp_path / "trading" / "enabled.json").read_text()) == [CODE]
+    assert list(Sent(tmp_path / "trading" / "enabled.json")) == [CODE]
 
 
 def test_an_order_filled_before_the_account_was_watched_is_its_history() -> None:
@@ -305,7 +303,11 @@ def test_a_status_alpaca_lists_and_the_mapping_does_not_is_unknown_then_known() 
     assert unknown.unknown_reason == ops.UNKNOWN_REASON_VENUE_STATUS_NOT_MAPPED
     assert unknown.status_as_reported.code == "held"
     run(rig.poll())
-    assert events(recorder)[1] == "PLACEMENT_EVENT_ACKNOWLEDGED"
+    # Found, it is reported resolved before what the venue says (SDK 0.37.0).
+    assert events(recorder)[1:] == [
+        "PLACEMENT_EVENT_OUTCOME_RESOLVED",
+        "PLACEMENT_EVENT_ACKNOWLEDGED",
+    ]
 
 
 def test_a_fills_price_from_two_averages() -> None:

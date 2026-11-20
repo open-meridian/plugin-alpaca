@@ -37,7 +37,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -45,7 +44,7 @@ from pathlib import Path
 from typing import Any
 
 import meridian
-from meridian import RecordKind, edge
+from meridian import RecordKind
 from meridian.v1 import sidecar_pb2
 
 log = logging.getLogger("alpaca.kinds")
@@ -66,12 +65,6 @@ ARCHIVED, KEPT, DELETED = "archived", "kept", "deleted"
 _UNSAFE = re.compile(r"[^A-Za-z0-9._:-]")
 _DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _MONTH = re.compile(r"^\d{4}-\d{2}$")
-
-
-def root() -> Path:
-    """The instance's granted storage, else a temporary directory."""
-    granted = edge.storage_dir()
-    return granted if granted is not None else Path(tempfile.mkdtemp(prefix="alpaca-kinds-"))
 
 
 def unit_of(kind: str, at: datetime) -> str:
